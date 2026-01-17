@@ -1,0 +1,5 @@
+{
+  "name": "TripBFF Clone",
+  "description": "A high-fidelity recreation of the TripBFF social travel app featuring map exploration, trip planning, and chat functionality.",
+  "requestFramePermissions": []
+}
