@@ -1,0 +1,188 @@
+//
+//  ChatsListView.swift
+//  ios loopa
+//
+//  Created by Thomas CHANG-HING-WING on 2026-01-17.
+//
+
+import SwiftUI
+
+enum ChatFilter: String, CaseIterable {
+    case all = "All"
+    case dms = "DMs"
+    case plans = "Plans"
+}
+
+struct ChatsListView: View {
+    let onChatClick: (Chat) -> Void
+    
+    @State private var selectedFilter: ChatFilter = .all
+    private let data = AppData.shared
+    
+    private var filteredChats: [Chat] {
+        switch selectedFilter {
+        case .all:
+            return data.chats
+        case .dms:
+            return data.chats.filter { $0.type == .dm }
+        case .plans:
+            return data.chats.filter { $0.type == .group }
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Enhanced Header
+            HStack {
+                Text("Chats")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Spacer()
+                
+                HStack(spacing: 12) {
+                    // Requests Badge
+                    Button(action: {}) {
+                        Text("0 Requests")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                Color.blue.opacity(0.15),
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    
+                    // Search Button
+                    Button(action: {}) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                .ultraThinMaterial,
+                                in: Circle()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .safeAreaInset(edge: .top) {
+                Color.clear.frame(height: 0)
+            }
+            .padding(.bottom, 20)
+            
+            // Enhanced Tabs with Liquid Glass
+            HStack(spacing: 0) {
+                ForEach(ChatFilter.allCases, id: \.self) { filter in
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            selectedFilter = filter
+                        }
+                    }) {
+                        Text(filter.rawValue)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(selectedFilter == filter ? .primary : .secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(
+                                selectedFilter == filter ? Color.white : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            )
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(6)
+            .background(
+                .regularMaterial,
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.horizontal, 20)
+            .padding(.bottom, 16)
+            
+            // Enhanced Chat List
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(filteredChats) { chat in
+                        chatRow(chat: chat)
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    onChatClick(chat)
+                                }
+                            }
+                    }
+                }
+                .padding(.bottom, 100)
+            }
+        }
+        .background(Color.white)
+    }
+    
+    private func chatRow(chat: Chat) -> some View {
+        HStack(spacing: 16) {
+            // Enhanced Avatar
+            AsyncImage(url: URL(string: chat.image)) { phase in
+                if let image = phase.image {
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else if phase.error != nil {
+                    Image(systemName: chat.type == .group ? "person.3.fill" : "person.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                } else {
+                    ProgressView()
+                        .tint(.secondary)
+                }
+            }
+            .frame(width: 60, height: 60)
+            .clipShape(Circle())
+            .overlay(
+                Circle()
+                    .strokeBorder(Color.white.opacity(0.3), lineWidth: 2)
+            )
+            
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(chat.title)
+                        .font(.system(size: 17, weight: chat.unread ? .semibold : .regular))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    
+                    Spacer()
+                    
+                    Text(chat.time)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(.tertiary)
+                }
+                
+                HStack(alignment: .center, spacing: 8) {
+                    Text(chat.message)
+                        .font(.system(size: 15, weight: chat.unread ? .medium : .regular))
+                        .foregroundStyle(chat.unread ? .primary : .secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    
+                    Spacer()
+                    
+                    if chat.unread {
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
+    }
+}

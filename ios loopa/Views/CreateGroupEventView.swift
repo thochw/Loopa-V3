@@ -1,0 +1,898 @@
+//
+//  CreateGroupEventView.swift
+//  ios loopa
+//
+//  Created by Thomas CHANG-HING-WING on 2026-01-17.
+//
+
+import SwiftUI
+import MapKit
+import PhotosUI
+
+struct CreateGroupEventView: View {
+    enum CreationType: Identifiable {
+        case group
+        case event
+        
+        var id: String {
+            switch self {
+            case .group: return "group"
+            case .event: return "event"
+            }
+        }
+    }
+    
+    @Environment(\.dismiss) private var dismiss
+    @Binding var showCelebration: Bool
+    var preselectedType: CreationType
+    
+    var body: some View {
+        ZStack {
+            if preselectedType == .group {
+                CreateGroupFlowView(onComplete: {
+                    showCelebration = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        dismiss()
+                    }
+                }, showCelebration: $showCelebration)
+            } else {
+                CreateEventFlowView(onComplete: {
+                    showCelebration = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        dismiss()
+                    }
+                }, showCelebration: $showCelebration)
+            }
+        }
+    }
+}
+
+// MARK: - Create Group Flow
+struct CreateGroupFlowView: View {
+    @Environment(\.dismiss) private var dismiss
+    enum Step: Int, CaseIterable {
+        case namePhoto = 0
+        case category = 1
+        case location = 2
+        
+        var title: String {
+            switch self {
+            case .namePhoto: return "Group Name"
+            case .category: return "Category"
+            case .location: return "Location"
+            }
+        }
+    }
+    
+    let onComplete: () -> Void
+    @Binding var showCelebration: Bool
+    @State private var currentStep: Step = .namePhoto
+    @State private var groupName: String = ""
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var groupImage: UIImage?
+    @State private var selectedCategory: String = ""
+    @State private var selectedLocation: CLLocationCoordinate2D?
+    
+    private let categories: [(name: String, color: Color, emoji: String)] = [
+        ("Food & Drinks", Color.pink, "🍽️"),
+        ("Sports", Color.orange, "⚽"),
+        ("Art & Culture", Color.purple, "🎨"),
+        ("Music", Color.pink, "🎵"),
+        ("Tech", Color.blue, "💻"),
+        ("Travel", Color.green, "✈️"),
+        ("Fitness", Color.orange, "💪"),
+        ("Gaming", Color.purple, "🎮")
+    ]
+    
+    var body: some View {
+        NavigationStack {
+            GeometryReader { geometry in
+                VStack(spacing: 0) {
+                    // Progress Indicator (Step X / Total)
+                    progressIndicator
+                    
+                    // Step Content
+                    ScrollView {
+                        stepContent
+                            .padding(.top, 12)
+                            .padding(.horizontal, 24)
+                            .frame(minHeight: geometry.size.height - 120) // Account for progress + buttons
+                    }
+                    .background(Color.white)
+                
+                // Navigation Buttons
+                HStack(spacing: 16) {
+                    if currentStep.rawValue > 0 {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                previousStep()
+                            }
+                        }) {
+                            Text("Back")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    .ultraThinMaterial,
+                                    in: RoundedRectangle(cornerRadius: 16)
+                                )
+                        }
+                    }
+                    
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            nextStep()
+                        }
+                    }) {
+                        Text(currentStep == .location ? "Create" : "Next")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                canProceed ? Color.appAccent : Color.gray,
+                                in: RoundedRectangle(cornerRadius: 16)
+                            )
+                    }
+                    .disabled(!canProceed)
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+                .padding(.bottom, 0) // No bottom padding to show rounded corners
+                .background(
+                    Color.white,
+                    in: UnevenRoundedRectangle(
+                        cornerRadii: .init(
+                            topLeading: 0,
+                            bottomLeading: 28,
+                            bottomTrailing: 28,
+                            topTrailing: 0
+                        ),
+                        style: .continuous
+                    )
+                )
+                }
+            }
+            .clipShape(UnevenRoundedRectangle(
+                cornerRadii: .init(
+                    topLeading: 0,
+                    bottomLeading: 28,
+                    bottomTrailing: 28,
+                    topTrailing: 0
+                ),
+                style: .continuous
+            ))
+            .background(Color.white)
+            .navigationTitle(currentStep.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundStyle(Color.appAccent)
+                }
+            }
+            .toolbarBackground(Color.white, for: .navigationBar)
+        }
+        .background(Color.white)
+    }
+    
+    private var progressIndicator: some View {
+        HStack(spacing: 8) {
+            ForEach(Step.allCases, id: \.rawValue) { step in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(step.rawValue <= currentStep.rawValue ? Color.appAccent : Color.gray.opacity(0.3))
+                    .frame(height: 4)
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+        .background(Color.white)
+    }
+    
+    @ViewBuilder
+    private var stepContent: some View {
+        switch currentStep {
+        case .namePhoto:
+            namePhotoStep
+        case .category:
+            categoryStep
+        case .location:
+            locationStep
+        }
+    }
+    
+    private var namePhotoStep: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Give your group a name")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Text("Choose a memorable name for your group")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
+            
+            TextField("Enter group name", text: $groupName)
+                .font(.system(size: 17, weight: .regular))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(
+                    .ultraThinMaterial,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 1)
+                )
+            
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Add a photo")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Text("Choose a photo that represents your group")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
+            
+            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                ZStack {
+                    if let groupImage = groupImage {
+                        // Miniature photo avec fond
+                        HStack(spacing: 12) {
+                            Image(uiImage: groupImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 80, height: 80)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 1)
+                                )
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Photo selected")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                Text("Tap to change")
+                                    .font(.system(size: 13, weight: .regular))
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundStyle(Color.appAccent)
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            Color(.systemGray6),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        )
+                    } else {
+                        // État vide avec placeholder
+                        VStack(spacing: 12) {
+                            Image(systemName: "photo.badge.plus")
+                                .font(.system(size: 40, weight: .light))
+                                .foregroundStyle(Color.appAccent)
+                            
+                            Text("Tap to add photo")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.appAccent)
+                            
+                            Text("JPG, PNG or HEIC")
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                        .background(
+                            Color(.systemGray6),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(
+                                    style: StrokeStyle(lineWidth: 2, dash: [8, 4])
+                                )
+                                .foregroundStyle(Color.secondary.opacity(0.3))
+                        )
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .onChange(of: selectedPhoto) { oldValue, newValue in
+                Task {
+                    if let data = try? await newValue?.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        groupImage = image
+                    }
+                }
+            }
+        }
+    }
+    
+    private var categoryStep: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Choose a category")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Text("What's your group about?")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
+            
+            // Pastilles (Flow Layout)
+            FlowLayout(spacing: 10) {
+                ForEach(categories, id: \.name) { category in
+                    Button(action: {
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+                            selectedCategory = category.name
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Text(category.emoji)
+                                .font(.system(size: 16))
+                            
+                            Text(category.name)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(selectedCategory == category.name ? .white : .primary)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            selectedCategory == category.name 
+                                ? AnyShapeStyle(category.color)
+                                : AnyShapeStyle(category.color.opacity(0.15)),
+                            in: Capsule()
+                        )
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(
+                                    selectedCategory == category.name ? Color.clear : category.color.opacity(0.3),
+                                    lineWidth: 1.5
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+    
+    private var locationStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Choose a location")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Text("Pin your group's location on the map")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
+            
+            LocationPickerMapView(selectedLocation: $selectedLocation)
+                .frame(height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color(.separator), lineWidth: 0.5)
+                )
+        }
+    }
+    
+    private var canProceed: Bool {
+        switch currentStep {
+        case .namePhoto:
+            return !groupName.isEmpty && groupImage != nil
+        case .category:
+            return !selectedCategory.isEmpty
+        case .location:
+            return selectedLocation != nil
+        }
+    }
+    
+    private func nextStep() {
+        if currentStep == .location {
+            // Create group
+            onComplete()
+        } else {
+            currentStep = Step(rawValue: currentStep.rawValue + 1) ?? .namePhoto
+        }
+    }
+    
+    private func previousStep() {
+        currentStep = Step(rawValue: currentStep.rawValue - 1) ?? .namePhoto
+    }
+}
+
+// MARK: - Create Event Flow
+struct CreateEventFlowView: View {
+    @Environment(\.dismiss) private var dismiss
+    enum Step: Int, CaseIterable {
+        case namePhoto = 0
+        case dateTimePrice = 1
+        case location = 2
+        
+        var title: String {
+            switch self {
+            case .namePhoto: return "Event Name"
+            case .dateTimePrice: return "Date & Time"
+            case .location: return "Location"
+            }
+        }
+    }
+    
+    let onComplete: () -> Void
+    @Binding var showCelebration: Bool
+    @State private var currentStep: Step = .namePhoto
+    @State private var eventName: String = ""
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var eventImage: UIImage?
+    @State private var eventDate: Date = Date()
+    @State private var selectedLocation: CLLocationCoordinate2D?
+    @State private var price: String = ""
+    @State private var isFree: Bool = true
+    
+    var body: some View {
+        NavigationStack {
+            GeometryReader { geometry in
+                VStack(spacing: 0) {
+                    // Progress Indicator
+                    progressIndicator
+                    
+                    // Step Content
+                    ScrollView {
+                        stepContent
+                            .padding(.top, 12)
+                            .padding(.horizontal, 24)
+                            .frame(minHeight: geometry.size.height - 120) // Account for progress + buttons
+                    }
+                    .background(Color.white)
+                
+                // Navigation Buttons
+                HStack(spacing: 16) {
+                    if currentStep.rawValue > 0 {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                previousStep()
+                            }
+                        }) {
+                            Text("Back")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    .ultraThinMaterial,
+                                    in: RoundedRectangle(cornerRadius: 16)
+                                )
+                        }
+                    }
+                    
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            nextStep()
+                        }
+                    }) {
+                        Text(currentStep == .location ? "Create" : "Next")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                canProceed ? Color.appAccent : Color.gray,
+                                in: RoundedRectangle(cornerRadius: 16)
+                            )
+                    }
+                    .disabled(!canProceed)
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+                .padding(.bottom, 0) // No bottom padding to show rounded corners
+                .background(
+                    Color.white,
+                    in: UnevenRoundedRectangle(
+                        cornerRadii: .init(
+                            topLeading: 0,
+                            bottomLeading: 28,
+                            bottomTrailing: 28,
+                            topTrailing: 0
+                        ),
+                        style: .continuous
+                    )
+                )
+                }
+            }
+            .clipShape(UnevenRoundedRectangle(
+                cornerRadii: .init(
+                    topLeading: 0,
+                    bottomLeading: 28,
+                    bottomTrailing: 28,
+                    topTrailing: 0
+                ),
+                style: .continuous
+            ))
+            .background(Color.white)
+            .navigationTitle(currentStep.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundStyle(Color.appAccent)
+                }
+            }
+            .toolbarBackground(Color.white, for: .navigationBar)
+        }
+        .background(Color.white)
+    }
+    
+    private var progressIndicator: some View {
+        HStack(spacing: 8) {
+            ForEach(Step.allCases, id: \.rawValue) { step in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(step.rawValue <= currentStep.rawValue ? Color.appAccent : Color.gray.opacity(0.3))
+                    .frame(height: 4)
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+        .background(Color.white)
+    }
+    
+    @ViewBuilder
+    private var stepContent: some View {
+        switch currentStep {
+        case .namePhoto:
+            namePhotoStep
+        case .dateTimePrice:
+            dateTimePriceStep
+        case .location:
+            locationStep
+        }
+    }
+    
+    private var namePhotoStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Give your event a name")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Text("Choose a memorable name for your event")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
+            
+            TextField("Enter event name", text: $eventName)
+                .font(.system(size: 17, weight: .regular))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(
+                    .ultraThinMaterial,
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 1)
+                )
+            
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Add a photo")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Text("Choose a photo that represents your event")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
+            
+            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                ZStack {
+                    if let eventImage = eventImage {
+                        // Miniature photo avec fond
+                        HStack(spacing: 12) {
+                            Image(uiImage: eventImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 80, height: 80)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 1)
+                                )
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Photo selected")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                Text("Tap to change")
+                                    .font(.system(size: 13, weight: .regular))
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundStyle(Color.appAccent)
+                        }
+                        .padding(16)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            Color(.systemGray6),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        )
+                    } else {
+                        // État vide avec placeholder
+                        VStack(spacing: 12) {
+                            Image(systemName: "photo.badge.plus")
+                                .font(.system(size: 40, weight: .light))
+                                .foregroundStyle(Color.appAccent)
+                            
+                            Text("Tap to add photo")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.appAccent)
+                            
+                            Text("JPG, PNG or HEIC")
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                        .background(
+                            Color(.systemGray6),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(
+                                    style: StrokeStyle(lineWidth: 2, dash: [8, 4])
+                                )
+                                .foregroundStyle(Color.secondary.opacity(0.3))
+                        )
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .onChange(of: selectedPhoto) { oldValue, newValue in
+                Task {
+                    if let data = try? await newValue?.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        eventImage = image
+                    }
+                }
+            }
+        }
+    }
+    
+    private var dateTimePriceStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Date and Time Section
+            VStack(alignment: .leading, spacing: 6) {
+                Text("When is your event?")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Text("Select date and time for your event")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
+            
+            // Date and Time Picker Card
+            VStack(spacing: 0) {
+                // Date Picker Section
+                HStack(spacing: 16) {
+                    Label("Date", systemImage: "calendar")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    
+                    Spacer()
+                    
+                    DatePicker("Date", selection: $eventDate, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                        .tint(Color.appAccent)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                
+                Divider()
+                    .padding(.horizontal, 16)
+                
+                // Time Picker Section
+                HStack(spacing: 16) {
+                    Label("Time", systemImage: "clock")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    
+                    Spacer()
+                    
+                    DatePicker("Time", selection: $eventDate, displayedComponents: .hourAndMinute)
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                        .tint(Color.appAccent)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            .background(
+                Color(.systemBackground),
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color(.separator), lineWidth: 0.5)
+            )
+            
+            // Price Section
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Event Price")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Text("Set the price for your event")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 4)
+            
+            VStack(spacing: 12) {
+                // Free Event Toggle
+                Toggle(isOn: $isFree) {
+                    HStack(spacing: 8) {
+                        Label("Free Event", systemImage: "tag")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.primary)
+                    }
+                }
+                .tint(Color.appAccent)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    Color(.systemGray6),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+                
+                // Price Input (if not free)
+                if !isFree {
+                    HStack(spacing: 12) {
+                        Label("Price", systemImage: "dollarsign.circle")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        
+                        Spacer()
+                        
+                        TextField("0.00", text: $price)
+                            .font(.system(size: 15, weight: .regular))
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 100)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        Color(.systemGray6),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
+                }
+            }
+        }
+    }
+    
+    private var locationStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Choose a location")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Text("Pin your event's location on the map")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
+            
+            LocationPickerMapView(selectedLocation: $selectedLocation)
+                .frame(height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color(.separator), lineWidth: 0.5)
+                )
+        }
+    }
+    
+    private var canProceed: Bool {
+        switch currentStep {
+        case .namePhoto:
+            return !eventName.isEmpty && eventImage != nil
+        case .dateTimePrice:
+            return isFree || !price.isEmpty // Date is always valid, just check price
+        case .location:
+            return selectedLocation != nil
+        }
+    }
+    
+    private func nextStep() {
+        if currentStep == .location {
+            // Create event
+            onComplete()
+        } else {
+            currentStep = Step(rawValue: currentStep.rawValue + 1) ?? .namePhoto
+        }
+    }
+    
+    private func previousStep() {
+        currentStep = Step(rawValue: currentStep.rawValue - 1) ?? .namePhoto
+    }
+}
+
+// MARK: - Location Picker Map View
+struct LocationPickerMapView: View {
+    @Binding var selectedLocation: CLLocationCoordinate2D?
+    @State private var region = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 45.5017, longitude: -73.5673),
+        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+    )
+    
+    var body: some View {
+        ZStack(alignment: .center) {
+            Map(coordinateRegion: $region, annotationItems: annotations) { item in
+                MapAnnotation(coordinate: item.coordinate) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(Color.appAccent)
+                }
+            }
+            .onTapGesture { location in
+                // Convert tap location to coordinate
+                // Note: This is a simplified version - in production, you'd need proper coordinate conversion
+            }
+            
+            // Center Pin
+            Image(systemName: "mappin.circle.fill")
+                .font(.system(size: 32))
+                .foregroundStyle(Color.appAccent)
+                .offset(y: -16)
+            
+            VStack {
+                Spacer()
+                Button(action: {
+                    selectedLocation = region.center
+                }) {
+                    Text("Select This Location")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 14)
+                        .background(
+                            Color.appAccent,
+                            in: Capsule()
+                        )
+                }
+                .padding(.bottom, 16)
+            }
+        }
+    }
+    
+    private var annotations: [LocationAnnotation] {
+        guard let location = selectedLocation else { return [] }
+        return [LocationAnnotation(coordinate: location)]
+    }
+    
+    private struct LocationAnnotation: Identifiable {
+        let id = UUID()
+        let coordinate: CLLocationCoordinate2D
+    }
+}
