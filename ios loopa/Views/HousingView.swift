@@ -1217,57 +1217,80 @@ private struct CreateHousingListingView: View {
     
     private func roommateCard(roommate: Roommate) -> some View {
         Button(action: {}) {
-            HStack(spacing: 16) {
-                AsyncImage(url: URL(string: roommate.image)) { phase in
-                    if let image = phase.image {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else if phase.error != nil {
-                        Image(systemName: "person.circle.fill")
-                            .foregroundStyle(.secondary)
-                            .background(.ultraThinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else {
-                        ProgressView()
-                            .tint(.secondary)
+            VStack(spacing: 0) {
+                ZStack(alignment: .topTrailing) {
+                    AsyncImage(url: URL(string: roommate.image)) { phase in
+                        if let image = phase.image {
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else if phase.error != nil {
+                            Color(.systemGray5)
+                        } else {
+                            ProgressView()
+                                .tint(.secondary)
+                        }
                     }
+                    .frame(height: 180)
+                    .clipped()
+                    
+                    // Move-in Badge
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white)
+                        Text(roommate.moveIn)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        .regularMaterial,
+                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    )
+                    .padding(16)
                 }
-                .frame(width: 84, height: 84)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .strokeBorder(.quaternary, lineWidth: 1)
-                )
                 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("\(roommate.name), \(roommate.age)")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    
-                    Text("\(roommate.location) • $\(roommate.budget)")
-                        .font(.system(size: 15, weight: .regular))
-                        .foregroundStyle(.secondary)
-                    
-                    // Enhanced Tags
-                    HStack(spacing: 6) {
-                        ForEach(roommate.tags, id: \.self) { tag in
-                            Text(tag)
-                                .font(.system(size: 11, weight: .medium))
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(roommate.name), \(roommate.age)")
+                                .font(.system(size: 19, weight: .semibold))
+                                .foregroundStyle(.primary)
+                            
+                            Text(roommate.location)
+                                .font(.system(size: 14, weight: .regular))
                                 .foregroundStyle(.secondary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(
-                                    .ultraThinMaterial,
-                                    in: Capsule()
-                                )
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("$\(roommate.budget)")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(Color.appAccent)
+                            Text("/mo")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if !roommate.tags.isEmpty {
+                        HStack(spacing: 6) {
+                            ForEach(roommate.tags.prefix(3), id: \.self) { tag in
+                                Text(tag)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(Color(.systemGray6), in: Capsule())
+                            }
                         }
                     }
                 }
-                
-                Spacer()
+                .padding(18)
             }
-            .padding(18)
             .background(Color(.secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
@@ -1281,57 +1304,97 @@ private struct CreateHousingListingView: View {
     }
     
     private func swapCard(swap: HomeSwap) -> some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .bottomLeading) {
-                AsyncImage(url: URL(string: swap.image)) { image in
-                    image.resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Color.gray.opacity(0.3)
-                }
-                .frame(height: 160)
-                .clipped()
-                
-                Text(swap.homeType)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.black.opacity(0.6))
-                    .clipShape(Capsule())
-                    .padding(12)
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text(swap.title)
-                    .font(.system(size: 18, weight: .bold))
-                
-                HStack {
-                    Text(swap.dates)
-                        .font(.system(size: 14))
-                        .foregroundColor(.gray)
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 8) {
-                        Text("Owner: \(swap.owner)")
-                            .font(.system(size: 11))
-                            .foregroundColor(.gray)
-                        
-                        AsyncImage(url: URL(string: swap.ownerImg)) { image in
-                            image.resizable()
-                        } placeholder: {
-                            Color.gray.opacity(0.3)
+        Button(action: {}) {
+            VStack(spacing: 0) {
+                ZStack(alignment: .topTrailing) {
+                    AsyncImage(url: URL(string: swap.image)) { phase in
+                        if let image = phase.image {
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else if phase.error != nil {
+                            Color(.systemGray5)
+                        } else {
+                            ProgressView()
+                                .tint(.secondary)
                         }
-                        .frame(width: 24, height: 24)
+                    }
+                    .frame(height: 180)
+                    .clipped()
+                    
+                    // Home Type Badge
+                    Text(swap.homeType)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            .regularMaterial,
+                            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        )
+                        .padding(16)
+                }
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(swap.title)
+                                .font(.system(size: 19, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(2)
+                            
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.appAccent)
+                                Text("Looking for: \(swap.target)")
+                                    .font(.system(size: 14, weight: .regular))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+
+                    Text(swap.dates)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color(.systemGray6), in: Capsule())
+                    
+                    // Enhanced Owner Section
+                    HStack(spacing: 10) {
+                        AsyncImage(url: URL(string: swap.ownerImg)) { phase in
+                            if let image = phase.image {
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } else {
+                                Image(systemName: "person.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(width: 28, height: 28)
                         .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(.quaternary, lineWidth: 1))
+                        
+                        Text("Swap by **\(swap.owner)**")
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(.secondary)
                     }
                 }
+                .padding(18)
             }
-            .padding(16)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(.quaternary, lineWidth: 0.5)
+            )
+            .contentShape(Rectangle())
         }
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(radius: 2)
+        .buttonStyle(.plain)
     }
 }

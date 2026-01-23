@@ -67,12 +67,20 @@ class AppData {
     
     let roommates: [Roommate] = [
         Roommate(id: 1, name: "Alex", age: 24, budget: 900, location: "Downtown / Old Port", image: "https://i.pravatar.cc/150?u=alex", tags: ["Student", "Non-smoker", "Quiet"], lat: 45.5000, lng: -73.5600, moveIn: "Sept 1st"),
-        Roommate(id: 2, name: "Mia", age: 26, budget: 1300, location: "Mile End", image: "https://i.pravatar.cc/150?u=mia", tags: ["Professional", "Pet friendly", "Social"], lat: 45.5150, lng: -73.5900, moveIn: "ASAP")
+        Roommate(id: 2, name: "Mia", age: 26, budget: 1300, location: "Mile End", image: "https://i.pravatar.cc/150?u=mia", tags: ["Professional", "Pet friendly", "Social"], lat: 45.5150, lng: -73.5900, moveIn: "ASAP"),
+        Roommate(id: 3, name: "Jordan", age: 28, budget: 1100, location: "Plateau Mont-Royal", image: "https://i.pravatar.cc/150?u=jordan", tags: ["Remote worker", "Clean", "Flexible"], lat: 45.5200, lng: -73.5800, moveIn: "Oct 1st"),
+        Roommate(id: 4, name: "Sam", age: 22, budget: 800, location: "Griffintown", image: "https://i.pravatar.cc/150?u=sam", tags: ["Student", "LGBTQ+ friendly", "Vegetarian"], lat: 45.4900, lng: -73.5650, moveIn: "ASAP"),
+        Roommate(id: 5, name: "Taylor", age: 30, budget: 1200, location: "Outremont", image: "https://i.pravatar.cc/150?u=taylor", tags: ["Professional", "Non-smoker", "Early riser"], lat: 45.5250, lng: -73.6000, moveIn: "Nov 1st"),
+        Roommate(id: 6, name: "Riley", age: 25, budget: 950, location: "Villeray", image: "https://i.pravatar.cc/150?u=riley", tags: ["Artist", "Pet friendly", "Social"], lat: 45.5400, lng: -73.6200, moveIn: "Dec 1st")
     ]
     
     let swaps: [HomeSwap] = [
-        HomeSwap(id: 1, title: "Modern Loft in Paris", target: "Montreal", dates: "Aug 10 - Aug 25", image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", owner: "Pierre", ownerImg: "https://i.pravatar.cc/150?u=pierre", lat: 45.5100, lng: -73.5700, homeType: "1 Bedroom Apt"),
-        HomeSwap(id: 2, title: "Beach House in Barcelona", target: "Montreal", dates: "Sept 2024", image: "https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", owner: "Elena", ownerImg: "https://i.pravatar.cc/150?u=elena", lat: 45.4950, lng: -73.5800, homeType: "Entire Home")
+        HomeSwap(id: 1, title: "Modern Loft in Paris", target: "Montreal", dates: "Aug 10 - Aug 25", image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", owner: "Pierre", ownerImg: "https://i.pravatar.cc/150?u=pierre", lat: 45.5100, lng: -73.5700, homeType: "Entire home"),
+        HomeSwap(id: 2, title: "Beach House in Barcelona", target: "Montreal", dates: "Sept 2024", image: "https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", owner: "Elena", ownerImg: "https://i.pravatar.cc/150?u=elena", lat: 45.4950, lng: -73.5800, homeType: "Entire home"),
+        HomeSwap(id: 3, title: "Cozy Apartment in Lisbon", target: "Montreal", dates: "Oct 15 - Nov 5", image: "https://images.unsplash.com/photo-1484154218962-a197022b5858?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", owner: "Maria", ownerImg: "https://i.pravatar.cc/150?u=maria", lat: 45.5050, lng: -73.5750, homeType: "1 Bedroom Apt"),
+        HomeSwap(id: 4, title: "Tokyo Studio Exchange", target: "Montreal", dates: "Dec 2024 - Jan 2025", image: "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", owner: "Yuki", ownerImg: "https://i.pravatar.cc/150?u=yuki", lat: 45.5150, lng: -73.5850, homeType: "Studio"),
+        HomeSwap(id: 5, title: "Berlin Flat Swap", target: "Montreal", dates: "Jan 10 - Feb 20", image: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", owner: "Lukas", ownerImg: "https://i.pravatar.cc/150?u=lukas", lat: 45.5000, lng: -73.5600, homeType: "2 Bedroom Apt"),
+        HomeSwap(id: 6, title: "Amsterdam Canal House", target: "Montreal", dates: "Mar 1 - Mar 15", image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", owner: "Sophie", ownerImg: "https://i.pravatar.cc/150?u=sophie", lat: 45.5200, lng: -73.5900, homeType: "Entire home")
     ]
     
     let chats: [Chat] = [
