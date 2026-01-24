@@ -421,6 +421,7 @@ struct LocationPickerMapView: View {
                         .foregroundStyle(Color.appAccent)
                 }
             }
+            .mapStyle(.standard(pointsOfInterest: .excludingAll))
             .onTapGesture { location in
                 // Convert tap location to coordinate
                 // Note: This is a simplified version - in production, you'd need proper coordinate conversion

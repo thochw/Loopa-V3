@@ -17,6 +17,21 @@ struct City: Identifiable {
     let flag: String
 }
 
+struct SearchSuggestion: Identifiable {
+    let id = UUID()
+    let name: String
+    let subtitle: String?
+    let coordinate: CLLocationCoordinate2D?
+    let type: SuggestionType
+    let icon: String
+    
+    enum SuggestionType {
+        case city
+        case place
+        case poi
+    }
+}
+
 struct ExploreView: View {
     enum Variant {
         case groups
@@ -50,6 +65,13 @@ struct ExploreView: View {
     @State private var showAllTravelers = false
     @State private var showProfileEditor = false
     @State private var friendsSheetType: FriendsSheetType = .travelers
+    
+    // Search functionality
+    @State private var searchText = ""
+    @State private var searchSuggestions: [SearchSuggestion] = []
+    @State private var isSearchFocused = false
+    @State private var isSearching = false
+    @FocusState private var searchFieldFocused: Bool
     private var isTeleported: Bool {
         variant == .travelers && currentCity != homeCity
     }
@@ -98,6 +120,7 @@ struct ExploreView: View {
                         annotationView(for: item)
                     }
                 }
+                .mapStyle(.standard(pointsOfInterest: .excludingAll))
                 .ignoresSafeArea()
                 .onTapGesture {
                     if variant == .groups && isSheetExpanded {
@@ -380,89 +403,266 @@ struct ExploreView: View {
     }
     
     private var groupsHeader: some View {
-        HStack(spacing: 12) {
-            Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                    showCitySearch = true
-                }
-            }) {
-                HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    
-                    Text(getCityName(from: currentCity))
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(.primary)
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 14)
-                .background(.regularMaterial)
-                .clipShape(Capsule())
-                .shadow(color: .black.opacity(0.1), radius: 8, y: 2)
-            }
-            .buttonStyle(.plain)
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                // Profile button
-                Button(action: {
-                    showProfileEditor = true
-                }) {
-                    AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80")) { phase in
-                        if let image = phase.image {
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } else if phase.error != nil {
-                            Image(systemName: "person.circle.fill")
-                                .foregroundStyle(.secondary)
+        // Enhanced Search Bar with profile picture inside (full width)
+        ZStack(alignment: .top) {
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.secondary)
+                
+                TextField("Search for places, cities...", text: $searchText)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .focused($searchFieldFocused)
+                    .onChange(of: searchText) { oldValue, newValue in
+                        if !newValue.isEmpty {
+                            searchForSuggestions(query: newValue)
                         } else {
-                            ProgressView()
-                                .tint(.secondary)
+                            searchSuggestions = []
                         }
                     }
-                    .frame(width: 44, height: 44) // HIG minimum touch target
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .strokeBorder(Color.white.opacity(0.3), lineWidth: 2.5)
-                    )
-                    .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                    .onSubmit {
+                        performSearch()
+                    }
+                
+                Spacer()
+                
+                // Profile picture or close button (inside search bar) - same size to prevent layout shift
+                Group {
+                    if searchText.isEmpty && !searchFieldFocused {
+                        Button(action: {
+                            showProfileEditor = true
+                        }) {
+                            AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80")) { phase in
+                                if let image = phase.image {
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } else if phase.error != nil {
+                                    Image(systemName: "person.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    ProgressView()
+                                        .tint(.secondary)
+                                }
+                            }
+                            .frame(width: 32, height: 32)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(Color.white.opacity(0.3), lineWidth: 1.5)
+                            )
+                        }
+                        .transition(.scale.combined(with: .opacity))
+                    } else {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                searchText = ""
+                                searchSuggestions = []
+                                searchFieldFocused = false
+                            }
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .symbolRenderingMode(.hierarchical)
+                        }
+                        .frame(width: 32, height: 32)
+                        .transition(.scale.combined(with: .opacity))
+                    }
                 }
+                .frame(width: 32, height: 32)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(.regularMaterial)
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.1), radius: 8, y: 2)
+            
+            // Search Suggestions Dropdown - scrollable list
+            if !searchSuggestions.isEmpty && searchFieldFocused {
+                ScrollView(showsIndicators: true) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(searchSuggestions.enumerated()), id: \.element.id) { index, suggestion in
+                            Button(action: {
+                                handleSuggestionTap(suggestion)
+                            }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: suggestion.icon)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 24)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(suggestion.name)
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundStyle(.primary)
+                                        
+                                        if let subtitle = suggestion.subtitle {
+                                            Text(subtitle)
+                                                .font(.system(size: 13, weight: .regular))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 12)
+                                .background(Color(.systemBackground))
+                            }
+                            .buttonStyle(.plain)
+                            
+                            if index < searchSuggestions.count - 1 {
+                                Divider()
+                                    .padding(.leading, 54)
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 400)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+                .padding(.top, 60)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
     
     private var travelersHeader: some View {
         VStack(spacing: 12) {
-            // Enhanced Search Bar
-            Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                    showCitySearch = true
-                }
-            }) {
+            // Enhanced Search Bar with profile picture inside (full width)
+            ZStack(alignment: .top) {
                 HStack(spacing: 12) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.secondary)
                     
-                    Text(getCityName(from: currentCity))
+                    TextField("Search for places, cities...", text: $searchText)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(.primary)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.search)
+                        .focused($searchFieldFocused)
+                        .onChange(of: searchText) { oldValue, newValue in
+                            if !newValue.isEmpty {
+                                searchForSuggestions(query: newValue)
+                            } else {
+                                searchSuggestions = []
+                            }
+                        }
+                        .onSubmit {
+                            performSearch()
+                        }
                     
                     Spacer()
+                    
+                    // Profile picture or close button (inside search bar) - same size to prevent layout shift
+                    Group {
+                        if searchText.isEmpty && !searchFieldFocused {
+                            Button(action: {
+                                showProfileEditor = true
+                            }) {
+                                AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80")) { phase in
+                                    if let image = phase.image {
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    } else if phase.error != nil {
+                                        Image(systemName: "person.circle.fill")
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        ProgressView()
+                                            .tint(.secondary)
+                                    }
+                                }
+                                .frame(width: 32, height: 32)
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 1.5)
+                                )
+                            }
+                            .transition(.scale.combined(with: .opacity))
+                        } else {
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    searchText = ""
+                                    searchSuggestions = []
+                                    searchFieldFocused = false
+                                }
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .symbolRenderingMode(.hierarchical)
+                            }
+                            .frame(width: 32, height: 32)
+                            .transition(.scale.combined(with: .opacity))
+                        }
+                    }
+                    .frame(width: 32, height: 32)
                 }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
                 .background(.regularMaterial)
                 .clipShape(Capsule())
                 .shadow(color: .black.opacity(0.1), radius: 8, y: 2)
+                
+                // Search Suggestions Dropdown - scrollable list
+                if !searchSuggestions.isEmpty && searchFieldFocused {
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(Array(searchSuggestions.enumerated()), id: \.element.id) { index, suggestion in
+                                Button(action: {
+                                    handleSuggestionTap(suggestion)
+                                }) {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: suggestion.icon)
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 24)
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(suggestion.name)
+                                                .font(.system(size: 15, weight: .medium))
+                                                .foregroundStyle(.primary)
+                                            
+                                            if let subtitle = suggestion.subtitle {
+                                                Text(subtitle)
+                                                    .font(.system(size: 13, weight: .regular))
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+                                        
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, 18)
+                                    .padding(.vertical, 12)
+                                    .background(Color(.systemBackground))
+                                }
+                                .buttonStyle(.plain)
+                                
+                                if index < searchSuggestions.count - 1 {
+                                    Divider()
+                                        .padding(.leading, 54)
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 300)
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+                    .padding(.top, 60)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
-            .buttonStyle(.plain)
             
             // Enhanced Filter Chips with better spacing
             ScrollView(.horizontal, showsIndicators: false) {
@@ -1256,6 +1456,231 @@ struct ExploreView: View {
             case .group(let group):
                 return "group-\(group.id)"
             }
+        }
+    }
+    
+    // MARK: - Search Functions
+    
+    private func searchForSuggestions(query: String) {
+        guard !query.isEmpty else {
+            searchSuggestions = []
+            return
+        }
+        
+        isSearching = true
+        
+        // First, check cities database for matches
+        var citySuggestions: [SearchSuggestion] = []
+        
+        // Search in cities - show all matching cities (no limit)
+        let cityMatches = cities.filter { city in
+            city.name.localizedCaseInsensitiveContains(query)
+        }
+        
+        for city in cityMatches {
+            citySuggestions.append(SearchSuggestion(
+                name: city.name,
+                subtitle: nil,
+                coordinate: city.coordinate,
+                type: .city,
+                icon: "mappin.circle.fill"
+            ))
+        }
+        
+        // Start with city suggestions immediately
+        self.searchSuggestions = citySuggestions
+        
+        // Use MKLocalSearchCompleter for comprehensive WORLDWIDE suggestions
+        let completer = MKLocalSearchCompleter()
+        completer.queryFragment = query
+        // Use a very large region to allow worldwide search (entire globe)
+        completer.region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            span: MKCoordinateSpan(latitudeDelta: 180, longitudeDelta: 360)
+        )
+        completer.resultTypes = [.pointOfInterest, .address, .query]
+        
+        // Process completer results as they come in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            guard completer.queryFragment == query else { return }
+            
+            let completerResults = completer.results
+            
+            // Process ALL completer results (typically up to 10)
+            for result in completerResults {
+                let detailRequest = MKLocalSearch.Request(completion: result)
+                // Don't limit region for worldwide search
+                detailRequest.region = MKCoordinateRegion(
+                    center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+                    span: MKCoordinateSpan(latitudeDelta: 180, longitudeDelta: 360)
+                )
+                let detailSearch = MKLocalSearch(request: detailRequest)
+                
+                detailSearch.start { detailResponse, _ in
+                    DispatchQueue.main.async {
+                        if let detailResponse = detailResponse, let firstItem = detailResponse.mapItems.first {
+                            let newSuggestion = SearchSuggestion(
+                                name: result.title,
+                                subtitle: result.subtitle,
+                                coordinate: firstItem.placemark.coordinate,
+                                type: .place,
+                                icon: self.iconForPlaceType(firstItem.pointOfInterestCategory)
+                            )
+                            
+                            // Add immediately if not duplicate
+                            var seenNames = Set(self.searchSuggestions.map { $0.name })
+                            if !seenNames.contains(newSuggestion.name) {
+                                self.searchSuggestions.append(newSuggestion)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Also do a direct MKLocalSearch for WORLDWIDE results
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = query
+        // Set worldwide region (entire globe) - this allows searching anywhere in the world
+        request.region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            span: MKCoordinateSpan(latitudeDelta: 180, longitudeDelta: 360)
+        )
+        request.resultTypes = [.pointOfInterest, .address]
+        
+        let search = MKLocalSearch(request: request)
+        search.start { response, error in
+            DispatchQueue.main.async {
+                self.isSearching = false
+                
+                if let response = response {
+                    let directSuggestions = response.mapItems.map { item in
+                        SearchSuggestion(
+                            name: item.name ?? "",
+                            subtitle: item.placemark.title,
+                            coordinate: item.placemark.coordinate,
+                            type: .place,
+                            icon: self.iconForPlaceType(item.pointOfInterestCategory)
+                        )
+                    }
+                    
+                    // Merge with existing suggestions, avoiding duplicates
+                    var seenNames = Set(self.searchSuggestions.map { $0.name })
+                    var updatedSuggestions = self.searchSuggestions
+                    
+                    for suggestion in directSuggestions {
+                        if !seenNames.contains(suggestion.name) {
+                            updatedSuggestions.append(suggestion)
+                            seenNames.insert(suggestion.name)
+                        }
+                    }
+                    
+                    self.searchSuggestions = updatedSuggestions
+                }
+            }
+        }
+    }
+    
+    private func iconForPlaceType(_ category: MKPointOfInterestCategory?) -> String {
+        guard let category = category else {
+            return "mappin.circle.fill"
+        }
+        
+        switch category {
+        case .restaurant:
+            return "fork.knife"
+        case .cafe:
+            return "cup.and.saucer.fill"
+        case .hotel:
+            return "bed.double.fill"
+        case .gasStation:
+            return "fuelpump.fill"
+        case .parking:
+            return "parkingsign.circle.fill"
+        case .museum:
+            return "building.columns.fill"
+        case .theater:
+            return "theatermasks.fill"
+        case .store:
+            return "bag.fill"
+        case .fitnessCenter:
+            return "figure.run"
+        case .school:
+            return "graduationcap.fill"
+        case .hospital:
+            return "cross.case.fill"
+        default:
+            return "mappin.circle.fill"
+        }
+    }
+    
+    private func handleSuggestionTap(_ suggestion: SearchSuggestion) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            searchText = suggestion.name
+            searchFieldFocused = false
+            searchSuggestions = []
+        }
+        
+        // If it's a city, teleport to it
+        if suggestion.type == .city, let coordinate = suggestion.coordinate {
+            teleportToLocation(coordinate)
+        } else if let coordinate = suggestion.coordinate {
+            // For places, center the map on the location
+            withAnimation {
+                region.center = coordinate
+                region.span = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            }
+        }
+    }
+    
+    private func performSearch() {
+        guard !searchText.isEmpty else { return }
+        
+        // Use MKLocalSearch for WORLDWIDE full search
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = searchText
+        // Set worldwide region (entire globe) - allows searching all POIs worldwide
+        request.region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            span: MKCoordinateSpan(latitudeDelta: 180, longitudeDelta: 360)
+        )
+        request.resultTypes = [.pointOfInterest, .address]
+        
+        let search = MKLocalSearch(request: request)
+        search.start { response, error in
+            DispatchQueue.main.async {
+                if let response = response, let firstResult = response.mapItems.first {
+                    let coordinate = firstResult.placemark.coordinate
+                    
+                    // Check if it's a city from our database
+                    if let city = self.cities.first(where: { city in
+                        abs(city.coordinate.latitude - coordinate.latitude) < 0.1 &&
+                        abs(city.coordinate.longitude - coordinate.longitude) < 0.1
+                    }) {
+                        self.teleportToLocation(city.coordinate)
+                    } else {
+                        // Center map on the found location (worldwide)
+                        withAnimation {
+                            self.region.center = coordinate
+                            self.region.span = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                        }
+                    }
+                }
+                
+                self.searchFieldFocused = false
+                self.searchSuggestions = []
+            }
+        }
+    }
+    
+    private func teleportToLocation(_ coordinate: CLLocationCoordinate2D) {
+        // Find matching city
+        if let city = cities.first(where: { city in
+            abs(city.coordinate.latitude - coordinate.latitude) < 0.1 &&
+            abs(city.coordinate.longitude - coordinate.longitude) < 0.1
+        }) {
+            selectedCity = city
+            showTeleportConfirmation = true
         }
     }
 }

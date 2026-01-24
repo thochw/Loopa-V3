@@ -259,6 +259,7 @@ struct HousingView: View {
                     }
                 }
             }
+            .mapStyle(.standard(pointsOfInterest: .excludingAll))
             .ignoresSafeArea(edges: .bottom)
 
             ScrollView(.horizontal, showsIndicators: false) {
