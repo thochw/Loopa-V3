@@ -67,7 +67,7 @@ class AppData {
     
     let roommates: [Roommate] = [
         Roommate(id: 1, name: "Alex", age: 24, budget: 900, location: "Downtown / Old Port", image: "https://i.pravatar.cc/150?u=alex", tags: ["Student", "Non-smoker", "Quiet"], lat: 45.5000, lng: -73.5600, moveIn: "Sept 1st"),
-        Roommate(id: 2, name: "Mia", age: 26, budget: 1300, location: "Mile End", image: "https://i.pravatar.cc/150?u=mia", tags: ["Professional", "Pet friendly", "Social"], lat: 45.5150, lng: -73.5900, moveIn: "ASAP"),
+        Roommate(id: 2, name: "Mia", age: 26, budget: 1300, location: "Mile End", image: "https://i.pravatar.cc/150?u=mia-friendly", tags: ["Professional", "Pet friendly", "Social"], lat: 45.5150, lng: -73.5900, moveIn: "ASAP"),
         Roommate(id: 3, name: "Jordan", age: 28, budget: 1100, location: "Plateau Mont-Royal", image: "https://i.pravatar.cc/150?u=jordan", tags: ["Remote worker", "Clean", "Flexible"], lat: 45.5200, lng: -73.5800, moveIn: "Oct 1st"),
         Roommate(id: 4, name: "Sam", age: 22, budget: 800, location: "Griffintown", image: "https://i.pravatar.cc/150?u=sam", tags: ["Student", "LGBTQ+ friendly", "Vegetarian"], lat: 45.4900, lng: -73.5650, moveIn: "ASAP"),
         Roommate(id: 5, name: "Taylor", age: 30, budget: 1200, location: "Outremont", image: "https://i.pravatar.cc/150?u=taylor", tags: ["Professional", "Non-smoker", "Early riser"], lat: 45.5250, lng: -73.6000, moveIn: "Nov 1st"),

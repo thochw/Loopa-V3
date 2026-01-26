@@ -46,7 +46,7 @@ struct CreateGroupFlowView: View {
         
         var title: String {
             switch self {
-            case .namePhoto: return "Place Name"
+            case .namePhoto: return "Group Name"
             case .category: return "Category"
             case .location: return "Location"
             }
@@ -196,7 +196,7 @@ struct CreateGroupFlowView: View {
     private var namePhotoStep: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Name this place")
+                Text("Name this group")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(.primary)
                 

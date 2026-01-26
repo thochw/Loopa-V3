@@ -63,7 +63,6 @@ struct ExploreView: View {
     @State private var showFilters = false
     @State private var selectedLifestyleFilter: String? = nil
     @State private var selectedExploreFilter: String? = nil
-    @State private var showCreateOptions = false
     @State private var selectedCreateType: CreateType? = nil
     @State private var selectedJoinItem: JoinItem?
     @State private var showAllTravelers = false
@@ -72,6 +71,7 @@ struct ExploreView: View {
     @State private var selectedSearchPin: SearchPin?
     @State private var selectedPlaceSheet: PlaceSelection?
     @State private var travelAnimationToken = UUID()
+    @State private var showCreatePlaceSheet = false
     
     // Search functionality
     @State private var searchText = ""
@@ -89,7 +89,7 @@ struct ExploreView: View {
 
     enum FriendsSheetType: String, CaseIterable {
         case travelers = "Travelers"
-        case groups = "Places"
+        case groups = "Groups"
     }
     
     // Cities database with coordinates
@@ -189,91 +189,50 @@ struct ExploreView: View {
                     .ignoresSafeArea(edges: .bottom)
                 }
                 
-                // Tap to dismiss pastilles (behind buttons but above map)
-                if showCreateOptions && variant == .groups {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                showCreateOptions = false
-                            }
-                        }
-                        .ignoresSafeArea()
-                }
                 
                 // Floating Action Buttons (Right Side) - Only for Groups variant
                 if variant == .groups {
-                    HStack(spacing: 12) {
-                        // Create Options Pills (Groups/Events) - Vertical Stack
-                        if showCreateOptions {
-                            VStack(spacing: 8) {
-                                // Groups Pill
-                                Button(action: {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        selectedCreateType = .group
-                                        showCreateOptions = false
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                            onAddGroupClick(.group)
-                                        }
-                                    }
-                                }) {
-                                    Text("Add place")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 10)
-                                        .background(Color.appAccent, in: Capsule())
-                                        .shadow(color: Color.appAccent.opacity(0.4), radius: 8, y: 4)
+                    VStack(spacing: 16) {
+                        // Recenter Map Button (on top)
+                        Button(action: {
+                            if let location = locationManager.location {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    currentCity = homeCity
+                                    selectedSearchPin = nil
+                                    region.center = adjustedCenter(location.coordinate)
                                 }
-                                .buttonStyle(.plain)
-                                
+                                updateCityFromLocation(location)
+                            } else {
+                                locationManager.requestLocationPermission()
+                                locationManager.startUpdatingLocation()
                             }
-                            .transition(.scale.combined(with: .opacity))
+                        }) {
+                            Image(systemName: "location.fill")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(.black)
+                                .frame(width: 56, height: 56)
+                                .background(
+                                    .regularMaterial,
+                                    in: Circle()
+                                )
+                                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
                         }
                         
-                        VStack(spacing: 16) {
-                            // Recenter Map Button (on top)
-                            Button(action: {
-                                if let location = locationManager.location {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        currentCity = homeCity
-                                        selectedSearchPin = nil
-                                        region.center = adjustedCenter(location.coordinate)
-                                    }
-                                    updateCityFromLocation(location)
-                                } else {
-                                    locationManager.requestLocationPermission()
-                                    locationManager.startUpdatingLocation()
-                                }
-                            }) {
-                                Image(systemName: "location.fill")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(.black)
-                                    .frame(width: 56, height: 56)
-                                    .background(
-                                        .regularMaterial,
-                                        in: Circle()
-                                    )
-                                    .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                        // Add Place Button (below, white on blue) - Opens sheet directly
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                showCreatePlaceSheet = true
                             }
-                            
-                            // Add Group Button (below, white on blue)
-                            Button(action: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    showCreateOptions.toggle()
-                                }
-                            }) {
-                                Image(systemName: showCreateOptions ? "xmark" : "plus")
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 56, height: 56)
-                                    .background(
-                                        Color.appAccent,
-                                        in: Circle()
-                                    )
-                                    .shadow(color: Color.appAccent.opacity(0.4), radius: 12, y: 6)
-                                    .rotationEffect(.degrees(showCreateOptions ? 45 : 0))
-                            }
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 56, height: 56)
+                                .background(
+                                    Color.appAccent,
+                                    in: Circle()
+                                )
+                                .shadow(color: Color.appAccent.opacity(0.4), radius: 12, y: 6)
                         }
                     }
                     .padding(.trailing, 20)
@@ -424,6 +383,12 @@ struct ExploreView: View {
                     showProfileEditor = false
                 }
             }
+            .sheet(isPresented: $showCreatePlaceSheet) {
+                CreatePlaceView()
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(24)
+            }
         }
     }
     
@@ -509,7 +474,7 @@ struct ExploreView: View {
                             }) {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 20, weight: .medium))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.appAccent.opacity(0.7))
                                     .symbolRenderingMode(.hierarchical)
                             }
                             .frame(width: 32, height: 32)
@@ -682,7 +647,7 @@ struct ExploreView: View {
                             }) {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 20, weight: .medium))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.appAccent.opacity(0.7))
                                     .symbolRenderingMode(.hierarchical)
                             }
                             .frame(width: 32, height: 32)
@@ -1094,7 +1059,7 @@ struct ExploreView: View {
     
     private var groupsView: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Nearby Places")
+            Text("Nearby Groups")
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(.primary)
                 .padding(.horizontal, 20)
@@ -1211,7 +1176,7 @@ struct ExploreView: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                    .padding(.vertical, 12)
                     .background(Color.appAccent)
                     .clipShape(RoundedRectangle(cornerRadius: 20))
             }
@@ -1227,7 +1192,7 @@ struct ExploreView: View {
             ZStack(alignment: .bottomLeading) {
                 userImageView(user)
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 130, height: 170)
+                    .frame(width: 110, height: 140)
                 
                 // Gradient overlay
                 LinearGradient(
@@ -1235,38 +1200,38 @@ struct ExploreView: View {
                     startPoint: .bottom,
                     endPoint: .top
                 )
-                .frame(height: 80)
-                .offset(y: 45)
+                .frame(height: 65)
+                .offset(y: 37.5)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(user.flag)
-                        .font(.system(size: 18))
-                        .offset(y: -145)
-                        .padding(.leading, 10)
-                        .padding(.top, 10)
+                        .font(.system(size: 16))
+                        .offset(y: -120)
+                        .padding(.leading, 8)
+                        .padding(.top, 8)
                     
                     HStack(spacing: 6) {
                         Text(user.name)
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundColor(.white)
                         Circle()
                             .fill(Color.green)
-                            .frame(width: 8, height: 8)
+                            .frame(width: 7, height: 7)
                     }
-                    .offset(y: -10)
+                    .offset(y: -8)
                     
                     Text(user.distance)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.white.opacity(0.9))
-                        .offset(y: -10)
+                        .offset(y: -8)
                 }
-                .padding(.leading, 12)
-                .padding(.bottom, 12)
+                .padding(.leading, 10)
+                .padding(.bottom, 10)
             }
-            .frame(width: 130, height: 170)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .frame(width: 110, height: 140)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
             )
         }

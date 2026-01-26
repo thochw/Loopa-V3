@@ -9,9 +9,8 @@ import SwiftUI
 import MapKit
 
 enum HousingTab: String, CaseIterable {
-    case spots = "Find a Spot"
+    case spots = "Housing"
     case roommates = "Roommates"
-    case swaps = "Home Swaps"
 }
 
 struct HousingView: View {
@@ -20,13 +19,15 @@ struct HousingView: View {
     @State private var selectedMapFilter: String? = nil
     @State private var showSearchFlow = false
     @State private var showCreateSheet = false
+    @State private var selectedHousingSpot: HousingSpot? = nil
+    @State private var selectedRoommate: Roommate? = nil
+    @State private var showDetailSheet = false
     @State private var mapRegion = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 45.5017, longitude: -73.5673),
         span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
     )
     @State private var housingSpots: [HousingSpot] = AppData.shared.housingSpots
     @State private var roommates: [Roommate] = AppData.shared.roommates
-    @State private var swaps: [HomeSwap] = AppData.shared.swaps
     private let data = AppData.shared
     
     var body: some View {
@@ -57,28 +58,46 @@ struct HousingView: View {
                         
                         ScrollView {
                             LazyVStack(spacing: 16) {
-                                switch activeTab {
-                                case .spots:
-                                ForEach(housingSpots) { spot in
+                                // Section header
+                                VStack(alignment: .leading, spacing: 8) {
+                                    switch activeTab {
+                                    case .spots:
+                                        Text("Housing Recommendations")
+                                            .font(.system(size: 22, weight: .bold))
+                                            .foregroundStyle(.primary)
+                                        Text("Places recommended by other users when moving to a new city")
+                                            .font(.system(size: 14, weight: .regular))
+                                            .foregroundStyle(.secondary)
+                                    case .roommates:
+                                        Text("Find Roommates")
+                                            .font(.system(size: 22, weight: .bold))
+                                            .foregroundStyle(.primary)
+                                        Text("Post that you're looking for roommates")
+                                            .font(.system(size: 14, weight: .regular))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 20)
+                                .padding(.top, 12)
+                                
+                                // Content based on active tab
+                                if activeTab == .spots {
+                                    ForEach(housingSpots) { spot in
                                         housingSpotCard(spot: spot)
                                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                                     }
-                                case .roommates:
-                                ForEach(roommates) { roommate in
+                                } else if activeTab == .roommates {
+                                    ForEach(roommates) { roommate in
                                         roommateCard(roommate: roommate)
-                                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                                    }
-                                case .swaps:
-                                ForEach(swaps) { swap in
-                                        swapCard(swap: swap)
                                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                                     }
                                 }
                             }
                             .padding(.horizontal, 20)
-                            .padding(.top, 12)
                             .padding(.bottom, 100)
                         }
+                        .id(activeTab)
                         .transition(.opacity.combined(with: .move(edge: .leading)))
                     }
                 }
@@ -111,10 +130,21 @@ struct HousingView: View {
                 housingSpots.insert(spot, at: 0)
             } onCreateRoommate: { roommate in
                 roommates.insert(roommate, at: 0)
-            } onCreateSwap: { swap in
-                swaps.insert(swap, at: 0)
             } onClose: {
                 showCreateSheet = false
+            }
+        }
+        .sheet(isPresented: $showDetailSheet) {
+            if let spot = selectedHousingSpot {
+                HousingDetailSheet(spot: spot, onClose: {
+                    showDetailSheet = false
+                    selectedHousingSpot = nil
+                })
+            } else if let roommate = selectedRoommate {
+                RoommateDetailSheet(roommate: roommate, onClose: {
+                    showDetailSheet = false
+                    selectedRoommate = nil
+                })
             }
         }
     }
@@ -205,19 +235,15 @@ struct HousingView: View {
             return "house.fill"
         case .roommates:
             return "person.2.fill"
-        case .swaps:
-            return "arrow.triangle.2.circlepath"
         }
     }
 
     private func tabLabel(for tab: HousingTab) -> String {
         switch tab {
         case .spots:
-            return "Housing"
+            return "Housing recommendations"
         case .roommates:
-            return "Roommates"
-        case .swaps:
-            return "Swaps"
+            return "Find roommates"
         }
     }
 
@@ -244,23 +270,37 @@ struct HousingView: View {
         ZStack(alignment: .top) {
             Map(coordinateRegion: $mapRegion, annotationItems: mapItems) { item in
                 MapAnnotation(coordinate: item.coordinate) {
-                    VStack(spacing: 4) {
-                        Image(systemName: item.icon)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 26, height: 26)
-                            .background(Color.appAccent, in: Circle())
-                        Text(item.title)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(Color.white, in: Capsule())
+                    Button(action: {
+                        if let spot = item.spot {
+                            selectedHousingSpot = spot
+                            selectedRoommate = nil
+                            showDetailSheet = true
+                        } else if let roommate = item.roommate {
+                            selectedRoommate = roommate
+                            selectedHousingSpot = nil
+                            showDetailSheet = true
+                        }
+                    }) {
+                        VStack(spacing: 4) {
+                            Image(systemName: item.icon)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 26, height: 26)
+                                .background(Color.appAccent, in: Circle())
+                            Text(item.title)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color.white, in: Capsule())
+                        }
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .mapStyle(.standard(pointsOfInterest: .excludingAll))
             .ignoresSafeArea(edges: .bottom)
+            .id(activeTab)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
@@ -292,8 +332,6 @@ struct HousingView: View {
             return ["Studio", "Private room", "Entire place"]
         case .roommates:
             return ["Pet friendly", "Quiet", "Social"]
-        case .swaps:
-            return ["Short stay", "Long stay", "Verified"]
         }
     }
 
@@ -325,6 +363,8 @@ struct HousingView: View {
         let title: String
         let coordinate: CLLocationCoordinate2D
         let icon: String
+        let spot: HousingSpot?
+        let roommate: Roommate?
     }
 
     private var mapItems: [MapItem] {
@@ -335,7 +375,9 @@ struct HousingView: View {
                     id: "spot-\($0.id)",
                     title: $0.title,
                     coordinate: CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng),
-                    icon: "house.fill"
+                    icon: "house.fill",
+                    spot: $0,
+                    roommate: nil
                 )
             }
         case .roommates:
@@ -344,16 +386,9 @@ struct HousingView: View {
                     id: "roommate-\($0.id)",
                     title: $0.name,
                     coordinate: CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng),
-                    icon: "person.fill"
-                )
-            }
-        case .swaps:
-            return swaps.map {
-                MapItem(
-                    id: "swap-\($0.id)",
-                    title: $0.title,
-                    coordinate: CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng),
-                    icon: "arrow.triangle.2.circlepath"
+                    icon: "person.fill",
+                    spot: nil,
+                    roommate: $0
                 )
             }
         }
@@ -699,11 +734,9 @@ private struct HousingSearchFlowView: View {
     private func tabLabel(for tab: HousingTab) -> String {
         switch tab {
         case .spots:
-            return "Housing"
+            return "Housing recommendations"
         case .roommates:
-            return "Roommates"
-        case .swaps:
-            return "Swaps"
+            return "Find roommates"
         }
     }
 }
@@ -723,10 +756,6 @@ private struct HousingSearchTabIcon: View {
                 .resizable()
                 .scaledToFill()
                 .scaleEffect(1.1)
-        case .swaps:
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(.primary)
         }
     }
 }
@@ -736,7 +765,6 @@ private struct CreateHousingListingView: View {
     let coordinate: CLLocationCoordinate2D
     let onCreateSpot: (HousingSpot) -> Void
     let onCreateRoommate: (Roommate) -> Void
-    let onCreateSwap: (HomeSwap) -> Void
     let onClose: () -> Void
 
     @State private var selectedTab: HousingTab
@@ -757,17 +785,11 @@ private struct CreateHousingListingView: View {
     @State private var roommateMoveIn = ""
     @State private var roommateTags = ""
 
-    @State private var swapTitle = ""
-    @State private var swapTarget = ""
-    @State private var swapDates = ""
-    @State private var swapHomeType = "Entire home"
-
     init(
         activeTab: Binding<HousingTab>,
         coordinate: CLLocationCoordinate2D,
         onCreateSpot: @escaping (HousingSpot) -> Void,
         onCreateRoommate: @escaping (Roommate) -> Void,
-        onCreateSwap: @escaping (HomeSwap) -> Void,
         onClose: @escaping () -> Void
     ) {
         _activeTab = activeTab
@@ -775,7 +797,6 @@ private struct CreateHousingListingView: View {
         self.coordinate = coordinate
         self.onCreateSpot = onCreateSpot
         self.onCreateRoommate = onCreateRoommate
-        self.onCreateSwap = onCreateSwap
         self.onClose = onClose
     }
 
@@ -847,16 +868,18 @@ private struct CreateHousingListingView: View {
             housingForm
         case .roommates:
             roommatesForm
-        case .swaps:
-            swapsForm
         }
     }
 
     private var housingForm: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Housing listing")
+            Text("Housing recommendation")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(.primary)
+            
+            Text("Share a place you recommend for people moving to a new city")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(.secondary)
 
             formTextField("Title", text: $housingTitle)
             formTextField("Price", text: $housingPrice, keyboard: .numberPad)
@@ -903,9 +926,13 @@ private struct CreateHousingListingView: View {
 
     private var roommatesForm: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Roommates listing")
+            Text("Find roommates")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(.primary)
+            
+            Text("Post that you're looking for roommates")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(.secondary)
 
             formTextField("Name", text: $roommateName)
             HStack(spacing: 12) {
@@ -918,18 +945,6 @@ private struct CreateHousingListingView: View {
         }
     }
 
-    private var swapsForm: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Home swap listing")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.primary)
-
-            formTextField("Title", text: $swapTitle)
-            formTextField("Target destination", text: $swapTarget)
-            formTextField("Dates", text: $swapDates)
-            formPicker("Home type", selection: $swapHomeType, options: ["Entire home", "Private room", "Studio"])
-        }
-    }
 
     private var actionBar: some View {
         Button(action: handleCreate) {
@@ -950,8 +965,6 @@ private struct CreateHousingListingView: View {
             return !housingTitle.isEmpty && Int(housingPrice) != nil
         case .roommates:
             return !roommateName.isEmpty && Int(roommateAge) != nil && Int(roommateBudget) != nil && !roommateLocation.isEmpty
-        case .swaps:
-            return !swapTitle.isEmpty && !swapTarget.isEmpty && !swapDates.isEmpty
         }
     }
 
@@ -1003,20 +1016,6 @@ private struct CreateHousingListingView: View {
                 moveIn: roommateMoveIn.isEmpty ? "ASAP" : roommateMoveIn
             )
             onCreateRoommate(roommate)
-        case .swaps:
-            let swap = HomeSwap(
-                id: Int(Date().timeIntervalSince1970),
-                title: swapTitle,
-                target: swapTarget,
-                dates: swapDates,
-                image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
-                owner: "You",
-                ownerImg: "https://i.pravatar.cc/150?u=you",
-                lat: coordinate.latitude,
-                lng: coordinate.longitude,
-                homeType: swapHomeType
-            )
-            onCreateSwap(swap)
         }
         onClose()
     }
@@ -1024,11 +1023,9 @@ private struct CreateHousingListingView: View {
     private func tabLabel(for tab: HousingTab) -> String {
         switch tab {
         case .spots:
-            return "Housing"
+            return "Housing recommendations"
         case .roommates:
-            return "Roommates"
-        case .swaps:
-            return "Swaps"
+            return "Find roommates"
         }
     }
 
@@ -1304,98 +1301,326 @@ private struct CreateHousingListingView: View {
         .buttonStyle(.plain)
     }
     
-    private func swapCard(swap: HomeSwap) -> some View {
-        Button(action: {}) {
-            VStack(spacing: 0) {
-                ZStack(alignment: .topTrailing) {
-                    AsyncImage(url: URL(string: swap.image)) { phase in
-                        if let image = phase.image {
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } else if phase.error != nil {
-                            Color(.systemGray5)
-                        } else {
-                            ProgressView()
-                                .tint(.secondary)
-                        }
-                    }
-                    .frame(height: 180)
-                    .clipped()
-                    
-                    // Home Type Badge
-                    Text(swap.homeType)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            .regularMaterial,
-                            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        )
-                        .padding(16)
-                }
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(swap.title)
-                                .font(.system(size: 19, weight: .semibold))
-                                .foregroundStyle(.primary)
-                                .lineLimit(2)
-                            
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.right.circle.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Color.appAccent)
-                                Text("Looking for: \(swap.target)")
-                                    .font(.system(size: 14, weight: .regular))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        
-                        Spacer()
-                    }
+}
 
-                    Text(swap.dates)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color(.systemGray6), in: Capsule())
-                    
-                    // Enhanced Owner Section
-                    HStack(spacing: 10) {
-                        AsyncImage(url: URL(string: swap.ownerImg)) { phase in
+// MARK: - Housing Detail Sheet
+private struct HousingDetailSheet: View {
+    let spot: HousingSpot
+    let onClose: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    // Hero Image
+                    ZStack(alignment: .topTrailing) {
+                        let heroImage = spot.photos.first ?? spot.image
+                        AsyncImage(url: URL(string: heroImage)) { phase in
                             if let image = phase.image {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
+                            } else if phase.error != nil {
+                                Color(.systemGray5)
                             } else {
-                                Image(systemName: "person.circle.fill")
+                                ProgressView()
+                                    .tint(.secondary)
+                            }
+                        }
+                        .frame(height: 280)
+                        .clipped()
+                        
+                        // Rating Badge
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.yellow)
+                            Text(String(format: "%.1f", spot.rating))
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.primary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            .regularMaterial,
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        )
+                        .padding(20)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Title and Price
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(spot.title)
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundStyle(.primary)
+                                
+                                Text(spot.type)
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text("\(spot.currency)\(spot.price)")
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundStyle(Color.appAccent)
+                                Text("/\(spot.period)")
+                                    .font(.system(size: 14, weight: .medium))
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        .frame(width: 28, height: 28)
-                        .clipShape(Circle())
-                        .overlay(Circle().strokeBorder(.quaternary, lineWidth: 1))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
                         
-                        Text("Swap by **\(swap.owner)**")
-                            .font(.system(size: 13, weight: .regular))
+                        // Description
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Description")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.primary)
+                            Text(spot.description)
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundStyle(.secondary)
+                                .lineSpacing(4)
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        // Badges
+                        if !spot.badges.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Features")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 10) {
+                                        ForEach(spot.badges, id: \.self) { badge in
+                                            Text(badge)
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundStyle(.primary)
+                                                .padding(.horizontal, 14)
+                                                .padding(.vertical, 8)
+                                                .background(Color(.systemGray6), in: Capsule())
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                        }
+                        
+                        // Recommender
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Recommended by")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.primary)
+                            HStack(spacing: 12) {
+                                AsyncImage(url: URL(string: spot.recommenderImg)) { phase in
+                                    if let image = phase.image {
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    } else {
+                                        Image(systemName: "person.circle.fill")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .frame(width: 44, height: 44)
+                                .clipShape(Circle())
+                                .overlay(Circle().strokeBorder(.quaternary, lineWidth: 1))
+                                
+                                Text(spot.recommender)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                
+                                Spacer()
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        // Photos Gallery
+                        if spot.photos.count > 1 {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Photos")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(Array(spot.photos.enumerated()), id: \.offset) { index, photo in
+                                            AsyncImage(url: URL(string: photo)) { phase in
+                                                if let image = phase.image {
+                                                    image
+                                                        .resizable()
+                                                        .aspectRatio(contentMode: .fill)
+                                                } else {
+                                                    Color(.systemGray5)
+                                                }
+                                            }
+                                            .frame(width: 120, height: 120)
+                                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                        }
+                    }
+                    .padding(.bottom, 40)
+                }
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.secondary)
                     }
                 }
-                .padding(18)
             }
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(.quaternary, lineWidth: 0.5)
-            )
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+    }
+}
+
+// MARK: - Roommate Detail Sheet
+private struct RoommateDetailSheet: View {
+    let roommate: Roommate
+    let onClose: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    // Hero Image
+                    ZStack(alignment: .topTrailing) {
+                        AsyncImage(url: URL(string: roommate.image)) { phase in
+                            if let image = phase.image {
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } else if phase.error != nil {
+                                Color(.systemGray5)
+                            } else {
+                                ProgressView()
+                                    .tint(.secondary)
+                            }
+                        }
+                        .frame(height: 280)
+                        .clipped()
+                        
+                        // Move-in Badge
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white)
+                            Text(roommate.moveIn)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            .regularMaterial,
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        )
+                        .padding(20)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Name, Age and Budget
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("\(roommate.name), \(roommate.age)")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundStyle(.primary)
+                                
+                                HStack(spacing: 6) {
+                                    Image(systemName: "mappin.circle.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.secondary)
+                                    Text(roommate.location)
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text("$\(roommate.budget)")
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundStyle(Color.appAccent)
+                                Text("/mo")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        
+                        // Move-in Date
+                        HStack(spacing: 12) {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 16))
+                                .foregroundStyle(Color.appAccent)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Move-in Date")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                Text(roommate.moveIn)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                            }
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .padding(.horizontal, 20)
+                        
+                        // Tags
+                        if !roommate.tags.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("About")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 10) {
+                                        ForEach(roommate.tags, id: \.self) { tag in
+                                            Text(tag)
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundStyle(.primary)
+                                                .padding(.horizontal, 14)
+                                                .padding(.vertical, 8)
+                                                .background(Color(.systemGray6), in: Capsule())
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                        }
+                    }
+                    .padding(.bottom, 40)
+                }
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
     }
 }
