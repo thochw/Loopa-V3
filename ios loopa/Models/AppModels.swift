@@ -65,6 +65,33 @@ struct HousingSpot: Identifiable, Codable {
     let lat: Double
     let lng: Double
     let type: String
+    let address: String?
+    let contact: String?
+    let availableDate: Date?
+    let isAvailableNow: Bool
+    
+    // Default values for backward compatibility
+    init(id: Int, title: String, description: String, price: Int, currency: String, period: String, image: String, photos: [String], badges: [String], rating: Double, recommender: String, recommenderImg: String, lat: Double, lng: Double, type: String, address: String? = nil, contact: String? = nil, availableDate: Date? = nil, isAvailableNow: Bool = true) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.price = price
+        self.currency = currency
+        self.period = period
+        self.image = image
+        self.photos = photos
+        self.badges = badges
+        self.rating = rating
+        self.recommender = recommender
+        self.recommenderImg = recommenderImg
+        self.lat = lat
+        self.lng = lng
+        self.type = type
+        self.address = address
+        self.contact = contact
+        self.availableDate = availableDate
+        self.isAvailableNow = isAvailableNow
+    }
 }
 
 // MARK: - Roommate Model

@@ -39,6 +39,8 @@ struct MainTabView: View {
     @State private var selectedTab: AppTab = .explore
     @State private var selectedUser: User?
     @State private var selectedChat: Chat?
+    @State private var chatInitialMessage: String? = nil
+    @State private var chatBeforeProfile: Chat? = nil  // Track chat when viewing profile from chat
     @State private var showCelebration = false
     @State private var preselectedCreateType: CreateGroupEventView.CreationType? = nil
     private let data = AppData.shared
@@ -50,21 +52,39 @@ struct MainTabView: View {
                 ProfileView(user: selectedUser!, onBack: {
                     withAnimation(.interactiveSpring(response: 0.45, dampingFraction: 0.9, blendDuration: 0.15)) {
                         selectedUser = nil
+                        // If we came from a chat, go back to it
+                        if let chat = chatBeforeProfile {
+                            selectedChat = chat
+                            chatBeforeProfile = nil
+                        }
                     }
                 }, onMessage: { user in
                     let chat = chatForUser(user)
                     withAnimation(.interactiveSpring(response: 0.45, dampingFraction: 0.9, blendDuration: 0.15)) {
                         selectedUser = nil
+                        chatBeforeProfile = nil
                         selectedChat = chat
                     }
                 })
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             } else if selectedChat != nil {
-                ChatDetailView(chat: selectedChat!) {
+                ChatDetailView(chat: selectedChat!, onBack: {
                     withAnimation(.interactiveSpring(response: 0.45, dampingFraction: 0.9, blendDuration: 0.15)) {
                         selectedChat = nil
+                        chatInitialMessage = nil
                     }
-                }
+                }, initialMessage: chatInitialMessage, onProfileClick: {
+                    if let chat = selectedChat, chat.type == .dm {
+                        let user = userFromChat(chat)
+                        withAnimation(.interactiveSpring(response: 0.45, dampingFraction: 0.9, blendDuration: 0.15)) {
+                            // Save the chat so we can return to it
+                            chatBeforeProfile = chat
+                            selectedChat = nil
+                            chatInitialMessage = nil
+                            selectedUser = user
+                        }
+                    }
+                })
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             } else {
                 contentView(for: selectedTab)
@@ -143,7 +163,13 @@ struct MainTabView: View {
                 onJoinGroupChat: { _ in }
             )
         case .housing:
-            HousingView()
+            HousingView(onMessageRoommate: { roommate in
+                let chat = chatForRoommate(roommate)
+                chatInitialMessage = "Hello 👋"
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    selectedChat = chat
+                }
+            })
         case .chats:
             ChatsListView { chat in
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -248,6 +274,47 @@ struct MainTabView: View {
             time: "Now",
             unread: false,
             type: .group
+        )
+    }
+
+    private func chatForRoommate(_ roommate: Roommate) -> Chat {
+        if let existing = data.chats.first(where: {
+            $0.type == .dm &&
+            ($0.title.caseInsensitiveCompare(roommate.name) == .orderedSame || $0.image == roommate.image)
+        }) {
+            return existing
+        }
+
+        return Chat(
+            id: 3000 + roommate.id,
+            title: roommate.name,
+            image: roommate.image,
+            message: "Start a conversation",
+            time: "Now",
+            unread: false,
+            type: .dm
+        )
+    }
+
+    private func userFromChat(_ chat: Chat) -> User {
+        // Try to find an existing user that matches the chat
+        if let existing = data.users.first(where: {
+            $0.name.caseInsensitiveCompare(chat.title) == .orderedSame || $0.image == chat.image
+        }) {
+            return existing
+        }
+
+        // Create a user from the chat info
+        return User(
+            id: chat.id,
+            name: chat.title,
+            distance: "Nearby",
+            flag: "🌍",
+            image: chat.image,
+            online: true,
+            lng: -73.5673,
+            lat: 45.5017,
+            lifestyle: nil
         )
     }
 }

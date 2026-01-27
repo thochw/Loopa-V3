@@ -39,6 +39,14 @@ struct CreatePlaceView: View {
         
         var title: String {
             switch self {
+            case .category: return "Save a place"
+            case .location: return "Save a place"
+            case .details: return "Save a place"
+            }
+        }
+        
+        var subtitle: String {
+            switch self {
             case .category: return "Choose Category"
             case .location: return "Location"
             case .details: return "Details"
@@ -180,10 +188,16 @@ struct CreatePlaceView: View {
     // MARK: - Step 1: Category
     private var categoryStep: some View {
         VStack(spacing: 20) {
-            Text("Select a category for this place")
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Choose Category")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Text("Select a category for this place")
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                 ForEach(PlaceCategory.allCases, id: \.self) { category in
@@ -199,34 +213,48 @@ struct CreatePlaceView: View {
                 selectedCategory = category
             }
         }) {
-            VStack(spacing: 12) {
-                Text(category.emoji)
-                    .font(.system(size: 48))
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 12) {
+                    Text(category.emoji)
+                        .font(.system(size: 48))
+                    
+                    Text(category.rawValue)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+                .background(
+                    Color(.systemBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(
+                            selectedCategory == category ? Color.appAccent : Color(.systemGray5),
+                            lineWidth: selectedCategory == category ? 2 : 1
+                        )
+                )
+                .shadow(
+                    color: selectedCategory == category ? Color.appAccent.opacity(0.2) : .black.opacity(0.05),
+                    radius: selectedCategory == category ? 8 : 4,
+                    y: selectedCategory == category ? 4 : 2
+                )
                 
-                Text(category.rawValue)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(selectedCategory == category ? .white : .primary)
+                // Selection dot
+                if selectedCategory == category {
+                    Circle()
+                        .fill(Color.appAccent)
+                        .frame(width: 24, height: 24)
+                        .overlay(
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.white)
+                        )
+                        .offset(x: -8, y: 8)
+                        .transition(.scale.combined(with: .opacity))
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 24)
-            .background(
-                selectedCategory == category
-                    ? category.color
-                    : Color(.systemBackground),
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(
-                        selectedCategory == category ? Color.clear : Color(.systemGray5),
-                        lineWidth: 1
-                    )
-            )
-            .shadow(
-                color: selectedCategory == category ? category.color.opacity(0.3) : .black.opacity(0.05),
-                radius: selectedCategory == category ? 12 : 4,
-                y: selectedCategory == category ? 6 : 2
-            )
         }
         .buttonStyle(.plain)
     }

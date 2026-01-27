@@ -11,10 +11,14 @@ import UIKit
 struct ChatDetailView: View {
     let chat: Chat
     let onBack: () -> Void
+    var initialMessage: String? = nil
+    var onProfileClick: (() -> Void)? = nil
     
     @State private var inputText = ""
     @State private var messages: [ChatMessage] = []
     @FocusState private var isInputFocused: Bool
+    @State private var showBlockAlert = false
+    @State private var showReportAlert = false
     
     private let data = AppData.shared
     
@@ -34,51 +38,79 @@ struct ChatDetailView: View {
                 }
                 .buttonStyle(.plain)
                 
-            // Enhanced Avatar
-            chatAvatarView(
-                image: chat.image,
-                placeholderSystemName: chat.type == .group ? "person.3.fill" : "person.circle.fill"
-            )
-                .frame(width: 44, height: 44)
-                .clipShape(Circle())
-                .overlay(Circle().strokeBorder(.quaternary, lineWidth: 1))
+            // Enhanced Avatar - Clickable for DMs
+                Button(action: {
+                    if chat.type == .dm {
+                        onProfileClick?()
+                    }
+                }) {
+                    chatAvatarView(
+                        image: chat.image,
+                        placeholderSystemName: chat.type == .group ? "person.3.fill" : "person.circle.fill"
+                    )
+                    .frame(width: 44, height: 44)
+                    .clipShape(Circle())
+                    .overlay(Circle().strokeBorder(.quaternary, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .disabled(chat.type == .group)
                 
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text(chat.title)
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.primary)
+                Button(action: {
+                    if chat.type == .dm {
+                        onProfileClick?()
+                    }
+                }) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text(chat.title)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.primary)
+                            
+                            if chat.type == .group {
+                                Text("🫶🏼")
+                                    .font(.system(size: 16))
+                            }
+                        }
                         
                         if chat.type == .group {
-                            Text("🫶🏼")
-                                .font(.system(size: 16))
-                        }
-                    }
-                    
-                    if chat.type == .group {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(Color.secondary.opacity(0.3))
-                                .frame(width: 20, height: 20)
-                            Text("80 members")
-                                .font(.system(size: 13, weight: .regular))
-                                .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 8, height: 8)
-                            Text("Online")
-                                .font(.system(size: 13, weight: .regular))
-                                .foregroundStyle(.secondary)
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(Color.secondary.opacity(0.3))
+                                    .frame(width: 20, height: 20)
+                                Text("80 members")
+                                    .font(.system(size: 13, weight: .regular))
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 8, height: 8)
+                                Text("Online")
+                                    .font(.system(size: 13, weight: .regular))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
+                .buttonStyle(.plain)
+                .disabled(chat.type == .group)
                 
                 Spacer()
                 
-                Button(action: {}) {
+                Menu {
+                    Button(role: .destructive, action: {
+                        showBlockAlert = true
+                    }) {
+                        Label("Block user", systemImage: "hand.raised.fill")
+                    }
+                    
+                    Button(role: .destructive, action: {
+                        showReportAlert = true
+                    }) {
+                        Label("Report user", systemImage: "exclamationmark.triangle.fill")
+                    }
+                } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(.primary)
@@ -145,7 +177,7 @@ struct ChatDetailView: View {
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 32))
-                        .foregroundColor(inputText.isEmpty ? .gray.opacity(0.3) : .blue)
+                        .foregroundColor(inputText.isEmpty ? .gray.opacity(0.3) : Color.appAccent)
                 }
                 .disabled(inputText.isEmpty)
             }
@@ -163,6 +195,26 @@ struct ChatDetailView: View {
         .background(Color.white)
         .onAppear {
             loadMessages()
+            if let initial = initialMessage {
+                inputText = initial
+            }
+        }
+        .alert("Block User", isPresented: $showBlockAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Block", role: .destructive) {
+                // Block user action
+                onBack()
+            }
+        } message: {
+            Text("Are you sure you want to block \(chat.title)? They won't be able to message you anymore.")
+        }
+        .alert("Report User", isPresented: $showReportAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Report", role: .destructive) {
+                // Report user action
+            }
+        } message: {
+            Text("Are you sure you want to report \(chat.title)? Our team will review this account.")
         }
     }
     

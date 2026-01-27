@@ -7,6 +7,8 @@
 
 import SwiftUI
 import MapKit
+import PhotosUI
+import Combine
 
 enum HousingTab: String, CaseIterable {
     case spots = "Housing"
@@ -14,6 +16,8 @@ enum HousingTab: String, CaseIterable {
 }
 
 struct HousingView: View {
+    var onMessageRoommate: ((Roommate) -> Void)? = nil
+    
     @State private var activeTab: HousingTab = .spots
     @State private var showMapView = false
     @State private var selectedMapFilter: String? = nil
@@ -108,7 +112,7 @@ struct HousingView: View {
                 selectedRoommate = nil
             })
         }
-        .sheet(item: $selectedTripForHousing) { trip in
+        .fullScreenCover(item: $selectedTripForHousing) { trip in
             RecommendedHousingMapView(
                 trip: trip,
                 spots: housingSpots,
@@ -411,7 +415,9 @@ struct HousingView: View {
 
             Spacer()
 
-            Button(action: {}) {
+            Button(action: {
+                onMessageRoommate?(roommate)
+            }) {
                 Text("Say hello 👋")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.appAccent)
@@ -484,9 +490,12 @@ struct HousingView: View {
         let onCreate: (Trip) -> Void
         let onClose: () -> Void
 
-        @State private var destination = ""
+        @State private var searchText = ""
+        @State private var selectedDestination: String? = nil
         @State private var startDate = Date()
         @State private var endDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        @StateObject private var locationSearcher = TripLocationSearcher()
+        @FocusState private var isSearchFocused: Bool
 
         var body: some View {
             NavigationStack {
@@ -510,10 +519,97 @@ struct HousingView: View {
                         Text("Destination")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.secondary)
-                        TextField("Where are you going?", text: $destination)
+                        
+                        if let selected = selectedDestination {
+                            // Selected destination display
+                            HStack {
+                                Image(systemName: "mappin.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(Color.appAccent)
+                                Text(selected)
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Button(action: {
+                                    selectedDestination = nil
+                                    searchText = ""
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            .background(Color.appAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        } else {
+                            // Search field
+                            HStack(spacing: 10) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(.secondary)
+                                TextField("Search city or country", text: $searchText)
+                                    .focused($isSearchFocused)
+                                    .onChange(of: searchText) { _, newValue in
+                                        locationSearcher.search(query: newValue)
+                                    }
+                                if !searchText.isEmpty {
+                                    Button(action: { searchText = "" }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 16))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 12)
                             .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+                        
+                        // Search results
+                        if selectedDestination == nil && !locationSearcher.results.isEmpty {
+                            ScrollView {
+                                VStack(spacing: 0) {
+                                    ForEach(locationSearcher.results, id: \.self) { result in
+                                        Button(action: {
+                                            let title = result.title
+                                            let subtitle = result.subtitle
+                                            selectedDestination = subtitle.isEmpty ? title : "\(title), \(subtitle)"
+                                            searchText = ""
+                                            isSearchFocused = false
+                                        }) {
+                                            HStack(spacing: 12) {
+                                                Image(systemName: "mappin.circle.fill")
+                                                    .font(.system(size: 20))
+                                                    .foregroundStyle(Color.appAccent)
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(result.title)
+                                                        .font(.system(size: 15, weight: .medium))
+                                                        .foregroundStyle(.primary)
+                                                    if !result.subtitle.isEmpty {
+                                                        Text(result.subtitle)
+                                                            .font(.system(size: 13))
+                                                            .foregroundStyle(.secondary)
+                                                    }
+                                                }
+                                                Spacer()
+                                            }
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 10)
+                                        }
+                                        .buttonStyle(.plain)
+                                        
+                                        if result != locationSearcher.results.last {
+                                            Divider()
+                                                .padding(.leading, 46)
+                                        }
+                                    }
+                                }
+                            }
+                            .frame(maxHeight: 200)
+                            .background(Color.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -525,8 +621,6 @@ struct HousingView: View {
                         DatePicker("End", selection: $endDate, in: startDate..., displayedComponents: .date)
                             .datePickerStyle(.compact)
                     }
-
-                    Spacer()
 
                     Button(action: createTrip) {
                         Text("Add trip")
@@ -542,20 +636,22 @@ struct HousingView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 .padding(.bottom, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemBackground))
             }
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
+            .presentationBackground(Color(.systemBackground))
         }
 
         private var canCreate: Bool {
-            !destination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            selectedDestination != nil
         }
 
         private func createTrip() {
-            let safeDestination = destination.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !safeDestination.isEmpty else { return }
+            guard let destination = selectedDestination else { return }
             let newTrip = Trip(
-                destination: safeDestination,
+                destination: destination,
                 startDate: startDate,
                 endDate: endDate,
                 imageUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80"
@@ -563,6 +659,7 @@ struct HousingView: View {
             onCreate(newTrip)
         }
     }
+
 
     private struct UpcomingTripsListView: View {
         @Binding var trips: [Trip]
@@ -705,50 +802,177 @@ struct HousingView: View {
         let avatarImages: [String]
         let onClose: () -> Void
 
+        enum SheetState {
+            case collapsed
+            case partial
+            case full
+        }
+
         @State private var region = MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 45.5017, longitude: -73.5673),
             span: MKCoordinateSpan(latitudeDelta: 0.25, longitudeDelta: 0.25)
         )
         @State private var hasAnimated = false
+        @State private var sheetState: SheetState = .partial
+        @State private var showFilterSheet = false
+        
+        // Filter states
+        @State private var selectedTypeFilters: Set<String> = []
+        @State private var selectedPriceFilters: Set<String> = []
+        @State private var selectedRatingFilters: Set<Int> = []
+        @State private var selectedArrivalDate: Date? = nil
+        
+        private let typeOptions = ["All", "Apartment", "House", "Student residence", "Room"]
+        private let priceOptions = ["All", "$0-500", "$500-1000", "$1000-1500", "$1500+"]
+        private let ratingOptions = [0, 1, 2, 3, 4, 5] // 0 = All
 
-        var body: some View {
-            ZStack(alignment: .top) {
-                Map(coordinateRegion: $region)
-                    .mapStyle(.standard)
-                    .ignoresSafeArea()
-                    .onAppear {
-                        animateToTrip()
+        private var filteredSpots: [HousingSpot] {
+            spots.filter { spot in
+                // Type filter: if empty or contains the spot's type
+                let typeMatch = selectedTypeFilters.isEmpty || selectedTypeFilters.contains(spot.type)
+                
+                // Price filter: if empty, show all; otherwise check if price falls in any selected range
+                let priceMatch: Bool
+                if selectedPriceFilters.isEmpty {
+                    priceMatch = true
+                } else {
+                    priceMatch = selectedPriceFilters.contains { range in
+                        switch range {
+                        case "$0-500": return spot.price <= 500
+                        case "$500-1000": return spot.price > 500 && spot.price <= 1000
+                        case "$1000-1500": return spot.price > 1000 && spot.price <= 1500
+                        case "$1500+": return spot.price > 1500
+                        default: return false
+                        }
                     }
-
-                HStack {
-                    Button(action: onClose) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 36, height: 36)
-                            .background(Color.white.opacity(0.9), in: Circle())
+                }
+                
+                // Rating filter: if empty, show all; otherwise check if rating matches any selected
+                let ratingMatch: Bool
+                if selectedRatingFilters.isEmpty {
+                    ratingMatch = true
+                } else {
+                    ratingMatch = selectedRatingFilters.contains { minRating in
+                        Int(spot.rating) >= minRating
                     }
-                    .buttonStyle(.plain)
-
-                    Spacer()
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-
-                VStack(spacing: 0) {
-                    Spacer()
-                    sheetContent
+                
+                // Availability filter - show spots available by the selected arrival date
+                let availabilityMatch: Bool
+                if let arrivalDate = selectedArrivalDate {
+                    // Show spots that are available now OR will be available by the arrival date
+                    availabilityMatch = spot.isAvailableNow || (spot.availableDate != nil && spot.availableDate! <= arrivalDate)
+                } else {
+                    availabilityMatch = true
                 }
+                
+                return typeMatch && priceMatch && ratingMatch && availabilityMatch
             }
         }
 
-        private var sheetContent: some View {
-            VStack(spacing: 16) {
+        var body: some View {
+            GeometryReader { geometry in
+                ZStack {
+                    // Map
+                    Map(coordinateRegion: $region)
+                        .mapStyle(.standard(pointsOfInterest: .excludingAll))
+                        .ignoresSafeArea()
+                        .onAppear {
+                            animateToTrip()
+                        }
+                        .opacity(sheetState == .full ? 0 : 1)
+                        .animation(.easeInOut(duration: 0.35), value: sheetState)
+
+                    // Back button (only when not full screen list)
+                    if sheetState != .full {
+                        VStack {
+                            HStack {
+                                Button(action: onClose) {
+                                    Image(systemName: "chevron.left")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(.primary)
+                                        .frame(width: 36, height: 36)
+                                        .background(Color.white.opacity(0.9), in: Circle())
+                                        .shadow(color: .black.opacity(0.1), radius: 8, y: 2)
+                                }
+                                .buttonStyle(.plain)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
+                            Spacer()
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
+                    // Bottom sheet or full list
+                    VStack(spacing: 0) {
+                        if sheetState == .full {
+                            fullScreenList(geometry: geometry)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .move(edge: .bottom).combined(with: .opacity)
+                                ))
+                        } else if sheetState == .partial {
+                            Spacer()
+                            partialSheet(geometry: geometry)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+                    }
+                    .animation(.spring(response: 0.5, dampingFraction: 0.85), value: sheetState)
+
+                    // Toggle pill at bottom
+                    VStack {
+                        Spacer()
+                        togglePill
+                            .padding(.bottom, sheetState == .collapsed ? 40 : 20)
+                    }
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: sheetState)
+                }
+            }
+            .sheet(isPresented: $showFilterSheet) {
+                filterSheet
+            }
+        }
+
+        private var togglePill: some View {
+            Button(action: {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    switch sheetState {
+                    case .collapsed:
+                        sheetState = .partial
+                    case .partial:
+                        sheetState = .collapsed
+                    case .full:
+                        sheetState = .partial
+                    }
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: sheetState == .full ? "map.fill" : "list.bullet")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text(sheetState == .full ? "Map" : "Show list")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(Color(hex: "222222"), in: Capsule())
+                .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
+            }
+            .buttonStyle(.plain)
+            .opacity(sheetState == .partial ? 0 : 1)
+        }
+
+        private func partialSheet(geometry: GeometryProxy) -> some View {
+            VStack(spacing: 12) {
+                // Drag handle
                 RoundedRectangle(cornerRadius: 2.5)
                     .fill(Color.secondary.opacity(0.4))
                     .frame(width: 36, height: 5)
                     .padding(.top, 10)
 
+                // Header
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text(tripTitle)
@@ -771,30 +995,532 @@ struct HousingView: View {
                 }
                 .padding(.horizontal, 20)
 
-                VStack(alignment: .leading, spacing: 12) {
+                // Filter chips
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        Button(action: { showFilterSheet = true }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text("Filters")
+                                    .font(.system(size: 13, weight: .semibold))
+                            }
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.white, in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.black.opacity(0.1), lineWidth: 1))
+                            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+                        }
+                        .buttonStyle(.plain)
+
+                        ForEach(Array(selectedTypeFilters), id: \.self) { type in
+                            filterChip(text: type, onRemove: { selectedTypeFilters.remove(type) })
+                        }
+                        ForEach(Array(selectedPriceFilters), id: \.self) { price in
+                            filterChip(text: price, onRemove: { selectedPriceFilters.remove(price) })
+                        }
+                        ForEach(Array(selectedRatingFilters), id: \.self) { rating in
+                            filterChip(text: "\(rating)+ ⭐", onRemove: { selectedRatingFilters.remove(rating) })
+                        }
+                        if let arrivalDate = selectedArrivalDate {
+                            filterChip(text: "Arrival: \(arrivalDate.formatted(date: .abbreviated, time: .omitted))", onRemove: { selectedArrivalDate = nil })
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+
+                // List header
+                HStack {
                     Text("Recommended Housing")
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(.primary)
-
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(spots) { spot in
-                                recommendedHousingRow(spot: spot)
-                            }
+                    Spacer()
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            sheetState = .full
                         }
+                    }) {
+                        Text("See all")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.appAccent)
                     }
-                    .frame(maxHeight: 260)
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 20)
+
+                // List
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(filteredSpots) { spot in
+                            recommendedHousingRow(spot: spot)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+                .frame(maxHeight: 220)
                 .padding(.bottom, 20)
             }
             .frame(maxWidth: .infinity)
             .background(Color.white)
-            .clipShape(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-            )
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .shadow(color: .black.opacity(0.15), radius: 30, y: -8)
-            .ignoresSafeArea(edges: .bottom)
+            .gesture(
+                DragGesture()
+                    .onEnded { value in
+                        let velocity = value.predictedEndTranslation.height - value.translation.height
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                            if value.translation.height > 50 || velocity > 500 {
+                                sheetState = .collapsed
+                            } else if value.translation.height < -50 || velocity < -500 {
+                                sheetState = .full
+                            }
+                        }
+                    }
+            )
+        }
+
+        private func fullScreenList(geometry: GeometryProxy) -> some View {
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                            sheetState = .partial
+                        }
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 36, height: 36)
+                            .background(Color(.systemGray6), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    Text(tripTitle)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.primary)
+
+                    Spacer()
+
+                    Button(action: { showFilterSheet = true }) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 36, height: 36)
+                            .background(Color(.systemGray6), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+
+                // Active filters
+                if !selectedTypeFilters.isEmpty || !selectedPriceFilters.isEmpty || !selectedRatingFilters.isEmpty || selectedArrivalDate != nil {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(Array(selectedTypeFilters), id: \.self) { type in
+                                filterChip(text: type, onRemove: { selectedTypeFilters.remove(type) })
+                            }
+                            ForEach(Array(selectedPriceFilters), id: \.self) { price in
+                                filterChip(text: price, onRemove: { selectedPriceFilters.remove(price) })
+                            }
+                            ForEach(Array(selectedRatingFilters), id: \.self) { rating in
+                                filterChip(text: "\(rating)+ ⭐", onRemove: { selectedRatingFilters.remove(rating) })
+                            }
+                            if let arrivalDate = selectedArrivalDate {
+                                filterChip(text: "Arrival: \(arrivalDate.formatted(date: .abbreviated, time: .omitted))", onRemove: { selectedArrivalDate = nil })
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.bottom, 12)
+                }
+
+                // Results count
+                HStack {
+                    Text("\(filteredSpots.count) results")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+
+                // Full list
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(filteredSpots) { spot in
+                            recommendedHousingRow(spot: spot)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 100)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.white)
+            .gesture(
+                DragGesture()
+                    .onEnded { value in
+                        if value.translation.height > 100 {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                                sheetState = .partial
+                            }
+                        }
+                    }
+            )
+        }
+
+        private func filterChip(text: String, onRemove: @escaping () -> Void) -> some View {
+            HStack(spacing: 6) {
+                Text(text)
+                    .font(.system(size: 13, weight: .semibold))
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.appAccent, in: Capsule())
+        }
+
+        private var filterSheet: some View {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 32) {
+                        // Type filter
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Image(systemName: "house.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(Color.appAccent)
+                                Text("Type of housing")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(.primary)
+                            }
+
+                            VStack(spacing: 12) {
+                                ForEach(typeOptions, id: \.self) { option in
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            if option == "All" {
+                                                selectedTypeFilters.removeAll()
+                                            } else {
+                                                if selectedTypeFilters.contains(option) {
+                                                    selectedTypeFilters.remove(option)
+                                                } else {
+                                                    selectedTypeFilters.insert(option)
+                                                }
+                                            }
+                                        }
+                                    }) {
+                                        HStack {
+                                            Text(option)
+                                                .font(.system(size: 16, weight: .medium))
+                                                .foregroundStyle(.primary)
+                                            Spacer()
+                                            if (option == "All" && selectedTypeFilters.isEmpty) || selectedTypeFilters.contains(option) {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .font(.system(size: 22))
+                                                    .foregroundStyle(Color.appAccent)
+                                            } else {
+                                                Circle()
+                                                    .strokeBorder(Color(.systemGray4), lineWidth: 2)
+                                                    .frame(width: 22, height: 22)
+                                            }
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 14)
+                                        .background(
+                                            (option == "All" && selectedTypeFilters.isEmpty) || selectedTypeFilters.contains(option)
+                                                ? Color.appAccent.opacity(0.1) 
+                                                : Color(.systemGray6),
+                                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .strokeBorder(
+                                                    (option == "All" && selectedTypeFilters.isEmpty) || selectedTypeFilters.contains(option)
+                                                        ? Color.appAccent.opacity(0.3) 
+                                                        : Color.clear,
+                                                    lineWidth: 1.5
+                                                )
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+
+                        Divider()
+                            .padding(.vertical, 4)
+
+                        // Price filter
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Image(systemName: "dollarsign.circle.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(Color.appAccent)
+                                Text("Price range/month")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(.primary)
+                            }
+
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(priceOptions, id: \.self) { option in
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            if option == "All" {
+                                                selectedPriceFilters.removeAll()
+                                            } else {
+                                                if selectedPriceFilters.contains(option) {
+                                                    selectedPriceFilters.remove(option)
+                                                } else {
+                                                    selectedPriceFilters.insert(option)
+                                                }
+                                            }
+                                        }
+                                    }) {
+                                        Text(option)
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundStyle(
+                                                (option == "All" && selectedPriceFilters.isEmpty) || selectedPriceFilters.contains(option)
+                                                    ? .white 
+                                                    : .primary
+                                            )
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 16)
+                                            .background(
+                                                (option == "All" && selectedPriceFilters.isEmpty) || selectedPriceFilters.contains(option)
+                                                    ? Color.appAccent 
+                                                    : Color(.systemGray6),
+                                                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                            .padding(.vertical, 4)
+                        
+                        // Rating filter
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(Color.appAccent)
+                                Text("Minimum rating")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(.primary)
+                            }
+                            
+                            HStack(spacing: 8) {
+                                // All option
+                                Button(action: {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        selectedRatingFilters.removeAll()
+                                    }
+                                }) {
+                                    Text("All")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(selectedRatingFilters.isEmpty ? .white : .primary)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 12)
+                                        .background(
+                                            selectedRatingFilters.isEmpty ? Color.appAccent : Color(.systemGray6),
+                                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                                
+                                ForEach(1...5, id: \.self) { rating in
+                                    Button(action: {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            if selectedRatingFilters.contains(rating) {
+                                                selectedRatingFilters.remove(rating)
+                                            } else {
+                                                selectedRatingFilters.insert(rating)
+                                            }
+                                        }
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            Text("\(rating)")
+                                                .font(.system(size: 14, weight: .semibold))
+                                            Image(systemName: "star.fill")
+                                                .font(.system(size: 12))
+                                        }
+                                        .foregroundStyle(selectedRatingFilters.contains(rating) ? .white : .primary)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 12)
+                                        .background(
+                                            selectedRatingFilters.contains(rating) ? Color.appAccent : Color(.systemGray6),
+                                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                            .padding(.vertical, 4)
+                        
+                        // Availability filter
+                        VStack(alignment: .leading, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Image(systemName: "calendar")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundStyle(Color.appAccent)
+                                    Text("Availability")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundStyle(.primary)
+                                }
+                                Text("When do you plan to arrive?")
+                                    .font(.system(size: 14, weight: .regular))
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            VStack(spacing: 12) {
+                                // Any date option
+                                Button(action: {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        selectedArrivalDate = nil
+                                    }
+                                }) {
+                                    HStack {
+                                        Text("Any date")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundStyle(.primary)
+                                        Spacer()
+                                        if selectedArrivalDate == nil {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .font(.system(size: 22))
+                                                .foregroundStyle(Color.appAccent)
+                                        } else {
+                                            Circle()
+                                                .strokeBorder(Color(.systemGray4), lineWidth: 2)
+                                                .frame(width: 22, height: 22)
+                                        }
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 14)
+                                    .background(
+                                        selectedArrivalDate == nil
+                                            ? Color.appAccent.opacity(0.1)
+                                            : Color(.systemGray6),
+                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .strokeBorder(
+                                                selectedArrivalDate == nil
+                                                    ? Color.appAccent.opacity(0.3)
+                                                    : Color.clear,
+                                                lineWidth: 1.5
+                                            )
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                
+                                // Date picker
+                                VStack(spacing: 0) {
+                                    HStack {
+                                        Text("Select arrival date")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundStyle(.primary)
+                                        Spacer()
+                                        DatePicker(
+                                            "",
+                                            selection: Binding(
+                                                get: { selectedArrivalDate ?? Date() },
+                                                set: { selectedArrivalDate = $0 }
+                                            ),
+                                            in: Date()...,
+                                            displayedComponents: .date
+                                        )
+                                        .labelsHidden()
+                                        .tint(Color.appAccent)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 14)
+                                    .background(
+                                        selectedArrivalDate != nil
+                                            ? Color.appAccent.opacity(0.1)
+                                            : Color(.systemGray6),
+                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .strokeBorder(
+                                                selectedArrivalDate != nil
+                                                    ? Color.appAccent.opacity(0.3)
+                                                    : Color.clear,
+                                                lineWidth: 1.5
+                                            )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 24)
+                    .padding(.bottom, 120)
+                }
+                .background(Color(.systemGroupedBackground))
+                .safeAreaInset(edge: .bottom) {
+                    VStack(spacing: 0) {
+                        Divider()
+                        Button(action: { showFilterSheet = false }) {
+                            Text("Show \(filteredSpots.count) results")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(Color.appAccent, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
+                    }
+                    .background(Color(.systemGroupedBackground))
+                }
+                .navigationTitle("Filters")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: { showFilterSheet = false }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Reset") {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedTypeFilters.removeAll()
+                                selectedPriceFilters.removeAll()
+                                selectedRatingFilters.removeAll()
+                                selectedArrivalDate = nil
+                            }
+                        }
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.appAccent)
+                    }
+                }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
         }
 
         private func recommendedHousingRow(spot: HousingSpot) -> some View {
@@ -1448,9 +2174,15 @@ private struct CreateHousingListingView: View {
     @State private var housingTitle = ""
     @State private var housingDescription = ""
     @State private var housingPrice = ""
-    @State private var housingPeriod = "mo"
+    @State private var housingPeriod = ""
     @State private var housingType = "Apartment"
-    @State private var housingPhotoUrls = ""
+    @State private var housingRating: Int = 0
+    @State private var housingContact = ""
+    @State private var housingAddress = ""
+    @State private var housingAvailability: Date = Date()
+    @State private var housingAvailabilityStatus = "Currently living here"
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var selectedImages: [UIImage] = []
     @State private var housingBadgesSelected: Set<String> = []
     @State private var housingBadgesCustom = ""
 
@@ -1480,8 +2212,7 @@ private struct CreateHousingListingView: View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
-                    header
-                    tabSelector
+                    closeButton
                     formContent
                     actionBar
                 }
@@ -1494,12 +2225,20 @@ private struct CreateHousingListingView: View {
         }
     }
 
-    private var header: some View {
-        HStack {
-            Text("Create")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(.primary)
+    private var closeButton: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(selectedTab == .spots ? "New housing recommendation" : "Find roommates")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(.primary)
+                
+                Text(selectedTab == .spots ? "Share a place you recommend for people moving to a new city" : "Post that you're looking for roommates")
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
+            
             Spacer()
+            
             Button(action: onClose) {
                 Image(systemName: "xmark")
                     .font(.system(size: 14, weight: .semibold))
@@ -1508,32 +2247,6 @@ private struct CreateHousingListingView: View {
                     .background(Color.white, in: Circle())
             }
             .buttonStyle(.plain)
-        }
-    }
-
-    private var tabSelector: some View {
-        HStack(alignment: .bottom, spacing: 32) {
-            ForEach(HousingTab.allCases, id: \.self) { tab in
-                Button(action: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        selectedTab = tab
-                        activeTab = tab
-                    }
-                }) {
-                    VStack(spacing: 6) {
-                        HousingSearchTabIcon(tab: tab)
-                            .frame(width: 60, height: 60)
-                        Text(tabLabel(for: tab))
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.primary)
-                        Capsule()
-                            .fill(selectedTab == tab ? Color.appAccent : Color.clear)
-                            .frame(width: 44, height: 3)
-                    }
-                    .frame(height: 86)
-                }
-                .buttonStyle(.plain)
-            }
         }
     }
 
@@ -1549,20 +2262,131 @@ private struct CreateHousingListingView: View {
 
     private var housingForm: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Housing recommendation")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.primary)
-            
-            Text("Share a place you recommend for people moving to a new city")
-                .font(.system(size: 13, weight: .regular))
-                .foregroundStyle(.secondary)
-
             formTextField("Title", text: $housingTitle)
-            formTextField("Price", text: $housingPrice, keyboard: .numberPad)
+            
+            HStack(spacing: 8) {
+                TextField("Price", text: $housingPrice)
+                    .keyboardType(.numberPad)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+                    )
+                    .frame(maxWidth: .infinity)
+                
+                Text("per")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+                
+                periodPicker
+            }
 
-            HStack(spacing: 12) {
-                formPicker("Period", selection: $housingPeriod, options: ["mo", "week", "day"])
-                formPicker("Type", selection: $housingType, options: ["Apartment", "House", "Student residence", "Room"])
+            formPicker("Type", selection: $housingType, options: ["Apartment", "House", "Student residence", "Room"])
+            
+            formTextField("Address", text: $housingAddress)
+            
+            // Rating
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Rating")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                
+                HStack(spacing: 8) {
+                    ForEach(1...5, id: \.self) { star in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                                housingRating = star
+                            }
+                        }) {
+                            Image(systemName: star <= housingRating ? "star.fill" : "star")
+                                .font(.system(size: 28, weight: .regular))
+                                .foregroundStyle(star <= housingRating ? .yellow : Color(.systemGray4))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    Spacer()
+                    
+                    if housingRating > 0 {
+                        Text(ratingLabel(for: housingRating))
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+                )
+            }
+            
+            formTextField("Contact (email, phone, or other)", text: $housingContact)
+            
+            // Availability / When are you leaving
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Next availability")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                
+                VStack(spacing: 10) {
+                    // Status picker
+                    HStack(spacing: 10) {
+                        ForEach(["Currently living here", "Already left"], id: \.self) { status in
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    housingAvailabilityStatus = status
+                                }
+                            }) {
+                                Text(status)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(housingAvailabilityStatus == status ? .white : .primary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        housingAvailabilityStatus == status ? Color.appAccent : Color(.systemGray6),
+                                        in: Capsule()
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer()
+                    }
+                    
+                    if housingAvailabilityStatus == "Currently living here" {
+                        HStack {
+                            Text("Leaving on")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            
+                            Spacer()
+                            
+                            DatePicker("", selection: $housingAvailability, in: Date()..., displayedComponents: .date)
+                                .labelsHidden()
+                                .tint(Color.appAccent)
+                        }
+                    } else {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(.green)
+                            Text("Available now")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.green)
+                            Spacer()
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+                )
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -1588,7 +2412,79 @@ private struct CreateHousingListingView: View {
                 }
             }
 
-            formTextField("Photo URLs (comma separated)", text: $housingPhotoUrls)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Photos")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                
+                PhotosPicker(
+                    selection: $selectedPhotoItems,
+                    maxSelectionCount: 10,
+                    matching: .images,
+                    photoLibrary: .shared()
+                ) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.appAccent)
+                        Text(selectedImages.isEmpty ? "Select photos" : "\(selectedImages.count) photo\(selectedImages.count > 1 ? "s" : "") selected")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(selectedImages.isEmpty ? .secondary : .primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .onChange(of: selectedPhotoItems) { _, newItems in
+                    Task {
+                        selectedImages.removeAll()
+                        for item in newItems {
+                            if let data = try? await item.loadTransferable(type: Data.self),
+                               let image = UIImage(data: data) {
+                                selectedImages.append(image)
+                            }
+                        }
+                    }
+                }
+                
+                if !selectedImages.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(Array(selectedImages.enumerated()), id: \.offset) { index, image in
+                                ZStack(alignment: .topTrailing) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 80, height: 80)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    
+                                    Button(action: {
+                                        selectedImages.remove(at: index)
+                                        if index < selectedPhotoItems.count {
+                                            selectedPhotoItems.remove(at: index)
+                                        }
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 18))
+                                            .foregroundStyle(.white, Color.black.opacity(0.6))
+                                    }
+                                    .offset(x: 6, y: -6)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Badges")
@@ -1602,14 +2498,6 @@ private struct CreateHousingListingView: View {
 
     private var roommatesForm: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Find roommates")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.primary)
-            
-            Text("Post that you're looking for roommates")
-                .font(.system(size: 13, weight: .regular))
-                .foregroundStyle(.secondary)
-
             formTextField("Name", text: $roommateName)
             HStack(spacing: 12) {
                 formTextField("Age", text: $roommateAge, keyboard: .numberPad)
@@ -1647,25 +2535,25 @@ private struct CreateHousingListingView: View {
     private func handleCreate() {
         switch selectedTab {
         case .spots:
-            let parsedPhotos = housingPhotoUrls
-                .split(separator: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
             let customBadges = housingBadgesCustom
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty }
             let allBadges = Array(housingBadgesSelected) + customBadges
-            let photos = parsedPhotos.isEmpty
+            // Note: In a production app, selected images would be uploaded to a server
+            // For now, using placeholder URLs
+            let photos = selectedImages.isEmpty
                 ? ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80"]
-                : parsedPhotos
+                : selectedImages.enumerated().map { index, _ in
+                    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80&v=\(index)"
+                }
             let spot = HousingSpot(
                 id: Int(Date().timeIntervalSince1970),
                 title: housingTitle,
                 description: housingDescription.isEmpty ? "No description yet." : housingDescription,
                 price: Int(housingPrice) ?? 0,
                 currency: "$",
-                period: housingPeriod,
+                period: housingPeriod.isEmpty ? "mo" : housingPeriod,
                 image: photos.first ?? "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
                 photos: photos,
                 badges: allBadges.isEmpty ? ["Furnished", "Near metro"] : allBadges,
@@ -1705,6 +2593,17 @@ private struct CreateHousingListingView: View {
         }
     }
 
+    private func ratingLabel(for rating: Int) -> String {
+        switch rating {
+        case 1: return "Poor"
+        case 2: return "Fair"
+        case 3: return "Good"
+        case 4: return "Very Good"
+        case 5: return "Excellent"
+        default: return ""
+        }
+    }
+    
     private func formTextField(_ title: String, text: Binding<String>, keyboard: UIKeyboardType = .default) -> some View {
         TextField(title, text: text)
             .keyboardType(keyboard)
@@ -1725,13 +2624,36 @@ private struct CreateHousingListingView: View {
         } label: {
             HStack(spacing: 6) {
                 Text("\(title):")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.appAccent)
                 Text(selection.wrappedValue)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.appAccent)
                 Spacer()
                 Image(systemName: "chevron.down")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.appAccent)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+            )
+        }
+    }
+
+    private var periodPicker: some View {
+        Menu {
+            ForEach(["mo", "week", "day"], id: \.self) { option in
+                Button(option) { housingPeriod = option }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(housingPeriod.isEmpty ? "Period" : housingPeriod)
+                    .foregroundStyle(Color.appAccent)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.appAccent)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
@@ -2440,5 +3362,37 @@ private struct RoommateDetailSheet: View {
         default:
             return "✨"
         }
+    }
+}
+
+// MARK: - Trip Location Searcher
+private class TripLocationSearcher: NSObject, ObservableObject, MKLocalSearchCompleterDelegate {
+    @Published var results: [MKLocalSearchCompletion] = []
+    private let completer = MKLocalSearchCompleter()
+    
+    override init() {
+        super.init()
+        completer.delegate = self
+        completer.resultTypes = .address
+    }
+    
+    func search(query: String) {
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            results = []
+            return
+        }
+        completer.queryFragment = query
+    }
+    
+    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        // Filter to show only cities and countries (results with geographic context)
+        results = completer.results.filter { result in
+            // Keep results that look like cities/countries (have subtitle or are single locations)
+            !result.title.contains("#") && !result.title.contains("Street") && !result.title.contains("Road") && !result.title.contains("Ave")
+        }
+    }
+    
+    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        results = []
     }
 }
