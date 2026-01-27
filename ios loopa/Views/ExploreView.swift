@@ -136,6 +136,15 @@ struct ExploreView: View {
                         }
                     }
                 }
+                .onChange(of: isSheetOpen) { _, isOpen in
+                    guard variant == .travelers else { return }
+                    let baseCoordinate = selectedSearchPin?.coordinate
+                        ?? locationManager.location?.coordinate
+                        ?? region.center
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        region.center = mapCenterForSheet(baseCoordinate, isOpen: isOpen)
+                    }
+                }
                 .onAppear {
                     locationManager.requestLocationPermission()
                     locationManager.startUpdatingLocation()
@@ -316,14 +325,14 @@ struct ExploreView: View {
                                 Text("Show Travelers")
                                     .font(.system(size: 15, weight: .semibold))
                             }
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.white)
                             .padding(.horizontal, 20)
                             .padding(.vertical, 12)
                             .background(
-                                .regularMaterial,
+                                Color(hex: "222222"),
                                 in: Capsule()
                             )
-                            .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+                            .shadow(color: .black.opacity(0.2), radius: 12, y: 4)
                         }
                         .padding(.bottom, 80)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -804,7 +813,7 @@ struct ExploreView: View {
                     lineWidth: 1
                 )
         )
-        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+        .shadow(color: .black.opacity(0.1), radius: 6, y: 3)
     }
     
     private func getCityName(from cityString: String) -> String {
@@ -900,7 +909,11 @@ struct ExploreView: View {
     }
 
     private func adjustedCenter(_ coordinate: CLLocationCoordinate2D) -> CLLocationCoordinate2D {
-        guard variant == .travelers else { return coordinate }
+        mapCenterForSheet(coordinate, isOpen: isSheetOpen)
+    }
+
+    private func mapCenterForSheet(_ coordinate: CLLocationCoordinate2D, isOpen: Bool) -> CLLocationCoordinate2D {
+        guard variant == .travelers, isOpen else { return coordinate }
         return CLLocationCoordinate2D(
             latitude: coordinate.latitude - 0.030,
             longitude: coordinate.longitude

@@ -46,11 +46,11 @@ struct ChatsListView: View {
                     Button(action: {}) {
                         Text("0 Requests")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(Color.appAccent)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .background(
-                                Color.blue.opacity(0.15),
+                                Color.appAccent.opacity(0.12),
                                 in: Capsule()
                             )
                     }
@@ -60,12 +60,13 @@ struct ChatsListView: View {
                     Button(action: {}) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                             .frame(width: 44, height: 44)
                             .background(
-                                .ultraThinMaterial,
+                                Color.white,
                                 in: Circle()
                             )
+                            .shadow(color: .black.opacity(0.08), radius: 6, y: 3)
                     }
                     .buttonStyle(.plain)
                 }
@@ -87,11 +88,11 @@ struct ChatsListView: View {
                     }) {
                         Text(filter.rawValue)
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(selectedFilter == filter ? .primary : .secondary)
+                            .foregroundStyle(selectedFilter == filter ? .white : .secondary)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
                             .background(
-                                selectedFilter == filter ? Color.white : Color.clear,
+                                selectedFilter == filter ? Color.appAccent : Color.clear,
                                 in: RoundedRectangle(cornerRadius: 10, style: .continuous)
                             )
                             .contentShape(Rectangle())
@@ -101,16 +102,15 @@ struct ChatsListView: View {
             }
             .padding(6)
             .background(
-                .regularMaterial,
+                Color(.systemGray6),
                 in: RoundedRectangle(cornerRadius: 14, style: .continuous)
             )
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .padding(.horizontal, 20)
             .padding(.bottom, 16)
             
             // Enhanced Chat List
             ScrollView {
-                LazyVStack(spacing: 0) {
+                LazyVStack(spacing: 12) {
                     ForEach(filteredChats) { chat in
                         chatRow(chat: chat)
                             .onTapGesture {
@@ -120,6 +120,7 @@ struct ChatsListView: View {
                             }
                     }
                 }
+                .padding(.horizontal, 20)
                 .padding(.bottom, 100)
             }
         }
@@ -137,7 +138,7 @@ struct ChatsListView: View {
             .clipShape(Circle())
             .overlay(
                 Circle()
-                    .strokeBorder(Color.white.opacity(0.3), lineWidth: 2)
+                    .strokeBorder(Color.white, lineWidth: 2)
             )
             
             VStack(alignment: .leading, spacing: 6) {
@@ -165,14 +166,21 @@ struct ChatsListView: View {
                     
                     if chat.unread {
                         Circle()
-                            .fill(Color.blue)
+                            .fill(Color.appAccent)
                             .frame(width: 10, height: 10)
+                            .shadow(color: Color.appAccent.opacity(0.4), radius: 4, y: 2)
                     }
                 }
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.vertical, 14)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.04), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.06), radius: 8, y: 4)
         .contentShape(Rectangle())
     }
 
