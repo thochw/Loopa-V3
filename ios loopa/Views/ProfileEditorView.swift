@@ -14,27 +14,22 @@ struct ProfileEditorView: View {
     private let profileName = "Thomas"
     private let profileCountry = "France"
     private let profileFlag = "🇫🇷"
-    private let daysUntilTrip = 12
-    private let tripProgress: CGFloat = 0.72
-    private let tripOrigin = "Montréal"
-    private let tripDestination = "Paris"
     private let avatarURL = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80"
     @State private var showAllGroups = false
     @State private var showAllFriends = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 16) {
-                profileCard
-                heroSection
+            VStack(spacing: 24) {
+                headerBar
+                profileSummary
                 groupsSection
                 friendsSection
             }
-            .padding(.top, 40)
+            .padding(.top, 12)
             .padding(.bottom, 24)
         }
-        .background(Color(.systemGroupedBackground))
-        .ignoresSafeArea(edges: .top)
+        .background(Color.white)
         .sheet(isPresented: $showAllGroups) {
             AllGroupsListView(groups: data.groups) {
                 showAllGroups = false
@@ -47,75 +42,19 @@ struct ProfileEditorView: View {
         }
     }
 
-    private var heroSection: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                LinearGradient(
-                    colors: [Color.appAccent.opacity(0.9), Color.blue.opacity(0.8)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                VStack(alignment: .leading, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tripOrigin)
-                            .font(.system(size: 30, weight: .bold))
-                            .foregroundStyle(.white)
-                        HStack(spacing: 8) {
-                            Image(systemName: "airplane")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.9))
-                            Text(tripDestination)
-                                .font(.system(size: 26, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.95))
-                        }
-                    }
-
-                    Text("\(daysUntilTrip) days until your next trip")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.9))
-
-                    GeometryReader { proxy in
-                        let barWidth = max(0, proxy.size.width)
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(Color.white.opacity(0.25))
-                                .frame(height: 8)
-
-                            Capsule()
-                                .fill(Color.white)
-                                .frame(width: max(20, barWidth * tripProgress), height: 8)
-                                .animation(.easeInOut(duration: 0.6), value: tripProgress)
-
-                            Image(systemName: "airplane")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(Color.white)
-                                .padding(6)
-                                .background(Color.white.opacity(0.25), in: Circle())
-                                .offset(x: max(0, barWidth * tripProgress - 10))
-                        }
-                    }
-                    .frame(height: 24)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-            }
-            .frame(height: 220)
-            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .padding(.horizontal, 16)
+    private var headerBar: some View {
+        HStack {
+            circleIconButton(systemName: "arrow.left", action: onClose)
+            Spacer()
+            circleIconButton(systemName: "gearshape") {}
         }
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
     }
 
-    private var profileCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                circleIconButton(systemName: "arrow.left", action: onClose)
-                Spacer()
-                circleIconButton(systemName: "gearshape") {}
-            }
-
-            HStack {
-                Spacer()
+    private var profileSummary: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 14) {
                 AsyncImage(url: URL(string: avatarURL)) { phase in
                     if let image = phase.image {
                         image.resizable().scaledToFill()
@@ -123,26 +62,22 @@ struct ProfileEditorView: View {
                         Color.gray.opacity(0.2)
                     }
                 }
-                .frame(width: 76, height: 76)
+                .frame(width: 72, height: 72)
                 .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(Color.white, lineWidth: 4)
-                )
-                Spacer()
-            }
-            .padding(.top, 4)
+                .overlay(Circle().stroke(Color.white, lineWidth: 3))
+                .shadow(color: .black.opacity(0.08), radius: 6, y: 3)
 
-            statsRow
-
-            HStack(spacing: 8) {
-                Text(profileName)
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-
-                Text(profileFlag)
-                    .font(.system(size: 18))
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text(profileName)
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Text(profileFlag)
+                            .font(.system(size: 18))
+                    }
+                    verificationPill
+                }
 
                 Spacer()
 
@@ -158,26 +93,11 @@ struct ProfileEditorView: View {
                 .buttonStyle(.plain)
             }
 
-            HStack(spacing: 8) {
-                verificationPill
-                Spacer()
-            }
-
-            Spacer(minLength: 0)
+            statsRow
         }
-        .padding(.top, 16)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 16)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.white.opacity(0.4), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
-        .padding(.horizontal, 16)
-        .padding(.top, 0)
+        .padding(.horizontal, 20)
     }
+
 
     private var statsRow: some View {
         HStack(spacing: 10) {
@@ -214,10 +134,9 @@ struct ProfileEditorView: View {
                         groupCard(group)
                     }
                 }
-                .padding(.vertical, 4)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 20)
     }
 
     private var friendsSection: some View {
@@ -240,13 +159,12 @@ struct ProfileEditorView: View {
                 }
                 .buttonStyle(.plain)
             }
-
             HStack(spacing: 12) {
                 Image(systemName: "person.3.fill")
-                    .font(.system(size: 28, weight: .semibold))
+                    .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(Color.appAccent)
                     .frame(width: 52, height: 52)
-                    .background(Color.appAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Color.appAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("No Friends Yet")
@@ -260,11 +178,10 @@ struct ProfileEditorView: View {
                 Spacer()
             }
             .padding(14)
-            .background(Color.white)
+            .background(Color.appAccent.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: .black.opacity(0.06), radius: 8, y: 4)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 20)
     }
 
     private var verificationPill: some View {
@@ -294,12 +211,68 @@ struct ProfileEditorView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.4), lineWidth: 1)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
+    }
+
+    private func groupRow(_ group: Explore) -> some View {
+        HStack(spacing: 12) {
+            AsyncImage(url: URL(string: group.image)) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                } else {
+                    Color.gray.opacity(0.2)
+                }
+            }
+            .frame(width: 56, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(group.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text("\(group.attendees) members")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            avatarStack(group.avatars)
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func friendRow(_ friend: User) -> some View {
+        HStack(spacing: 12) {
+            AsyncImage(url: URL(string: friend.image)) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFill()
+                } else {
+                    Color.gray.opacity(0.2)
+                }
+            }
+            .frame(width: 48, height: 48)
+            .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(friend.name)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(friend.flag)
+                    .font(.system(size: 13))
+            }
+
+            Spacer()
+
+            Text(friend.distance)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 8)
     }
 
     private func groupCard(_ group: Explore) -> some View {
@@ -309,7 +282,7 @@ struct ProfileEditorView: View {
                     if let image = phase.image {
                         image.resizable().scaledToFill()
                     } else {
-                        Color.gray.opacity(0.2)
+                        Color.white
                     }
                 }
                 .frame(height: 120)
@@ -348,13 +321,13 @@ struct ProfileEditorView: View {
         }
         .padding(12)
         .frame(width: 220, height: 230)
-        .background(.ultraThinMaterial)
+        .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white.opacity(0.4), lineWidth: 1)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.08), radius: 10, y: 5)
+        .shadow(color: .black.opacity(0.08), radius: 12, y: 6)
     }
 
     private func avatarStack(_ urls: [String]) -> some View {
@@ -380,11 +353,12 @@ struct ProfileEditorView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(width: 40, height: 40)
-                .background(.ultraThinMaterial, in: Circle())
+                .background(Color.white, in: Circle())
                 .overlay(
                     Circle()
-                        .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
                 )
+                .shadow(color: .black.opacity(0.06), radius: 6, y: 3)
         }
         .buttonStyle(.plain)
     }
