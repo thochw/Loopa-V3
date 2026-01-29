@@ -64,6 +64,7 @@ struct HousingView: View {
                             findRoommatesSection
                         }
                         .padding(.horizontal, 20)
+                        .padding(.top, 18)
                         .padding(.bottom, 120)
                     }
                     .id(activeTab)
@@ -125,7 +126,7 @@ struct HousingView: View {
     private var myTripHeader: some View {
         HStack {
             Text("My trip")
-                .font(.app(size: 24, weight: .bold))
+                .font(.app(size: 26, weight: .bold))
                 .foregroundStyle(.primary)
 
             Spacer()
@@ -227,6 +228,7 @@ struct HousingView: View {
                 .padding(.horizontal, 2)
             }
         }
+        .padding(.bottom, 24)
     }
 
     private var recommendedHousingSection: some View {
@@ -262,6 +264,7 @@ struct HousingView: View {
             }
             .buttonStyle(.plain)
         }
+        .padding(.bottom, 8)
     }
 
     private var findRoommatesSection: some View {
@@ -279,12 +282,12 @@ struct HousingView: View {
     private func sectionHeader(title: String, actionText: String, action: @escaping () -> Void) -> some View {
         HStack {
             Text(title)
-                .font(.app(size: 18, weight: .bold))
+                .font(.app(size: 19, weight: .bold))
                 .foregroundStyle(.primary)
             Spacer()
             Button(action: action) {
                 Text(actionText)
-                    .font(.app(size: 14, weight: .semibold))
+                    .font(.app(size: 15, weight: .semibold))
                     .foregroundStyle(Color.appAccent)
             }
             .buttonStyle(.plain)
@@ -321,18 +324,18 @@ struct HousingView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("🌍 \(trip.destination)")
-                        .font(.app(size: 16, weight: .bold))
+                        .font(.app(size: 17, weight: .bold))
                         .foregroundStyle(.white)
                     Spacer()
                     Text(dateLabel.uppercased())
-                        .font(.app(size: 11, weight: .semibold))
+                        .font(.app(size: 12, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.9))
                 }
 
                 HStack(spacing: 8) {
                     avatarStack(images: Array(avatarImages))
                     Text(statusText ?? "+\(countdown) days")
-                        .font(.app(size: 12, weight: .semibold))
+                        .font(.app(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -1842,7 +1845,7 @@ private struct HousingSearchFlowView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.white)
             .navigationBarHidden(true)
         }
     }
@@ -2192,6 +2195,7 @@ private struct CreateHousingListingView: View {
     @State private var roommateLocation = ""
     @State private var roommateMoveIn = ""
     @State private var roommateTags = ""
+    @State private var currentStep = 0
 
     init(
         activeTab: Binding<HousingTab>,
@@ -2210,44 +2214,74 @@ private struct CreateHousingListingView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 16) {
+            ZStack {
+                Color.white.ignoresSafeArea()
+
+                VStack(spacing: 0) {
                     closeButton
-                    formContent
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 16) {
+                            formContent
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                        .padding(.bottom, 24)
+                        .id(currentStep)
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: currentStep)
+                    }
+                    .background(Color.white)
+
                     actionBar
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
             .navigationBarHidden(true)
         }
     }
 
     private var closeButton: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(selectedTab == .spots ? "New housing recommendation" : "Find roommates")
-                    .font(.app(size: 22, weight: .bold))
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(selectedTab == .spots ? "New housing recommendation" : "Find roommates")
+                        .font(.app(size: 22, weight: .bold))
+                        .foregroundStyle(.primary)
+                }
+
+                Spacer()
+
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 34, height: 34)
+                        .background(Color.white, in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+            
+            HStack(alignment: .center, spacing: 10) {
+                Text(stepTitle)
+                    .font(.app(size: 13, weight: .semibold))
                     .foregroundStyle(.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemGray6), in: Capsule())
                 
-                Text(selectedTab == .spots ? "Share a place you recommend for people moving to a new city" : "Post that you're looking for roommates")
-                    .font(.app(size: 14, weight: .regular))
-                    .foregroundStyle(.secondary)
+                stepIndicator
             }
-            
-            Spacer()
-            
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 34, height: 34)
-                    .background(Color.white, in: Circle())
-            }
-            .buttonStyle(.plain)
         }
+        .padding(14)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.08), radius: 12, y: 6)
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
     }
 
     @ViewBuilder
@@ -2262,265 +2296,419 @@ private struct CreateHousingListingView: View {
 
     private var housingForm: some View {
         VStack(alignment: .leading, spacing: 12) {
-            formTextField("Title", text: $housingTitle)
-            
-            HStack(spacing: 8) {
-                TextField("Price", text: $housingPrice)
-                    .keyboardType(.numberPad)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
-                    )
-                    .frame(maxWidth: .infinity)
-                
-                Text("per")
-                    .font(.app(size: 14, weight: .medium))
-                    .foregroundStyle(.secondary)
-                
-                periodPicker
-            }
-
-            formPicker("Type", selection: $housingType, options: ["Apartment", "House", "Student residence", "Room"])
-            
-            formTextField("Address", text: $housingAddress)
-            
-            // Rating
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Rating")
-                    .font(.app(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                
-                HStack(spacing: 8) {
-                    ForEach(1...5, id: \.self) { star in
-                        Button(action: {
-                            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
-                                housingRating = star
-                            }
-                        }) {
-                            Image(systemName: star <= housingRating ? "star.fill" : "star")
-                                .font(.system(size: 28, weight: .regular))
-                                .foregroundStyle(star <= housingRating ? .yellow : Color(.systemGray4))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    
-                    Spacer()
-                    
-                    if housingRating > 0 {
-                        Text(ratingLabel(for: housingRating))
-                            .font(.app(size: 14, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
-                )
-            }
-            
-            formTextField("Contact (email, phone, or other)", text: $housingContact)
-            
-            // Availability / When are you leaving
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Next availability")
-                    .font(.app(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                
-                VStack(spacing: 10) {
-                    // Status picker
-                    HStack(spacing: 10) {
-                        ForEach(["Currently living here", "Already left"], id: \.self) { status in
-                            Button(action: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    housingAvailabilityStatus = status
-                                }
-                            }) {
-                                Text(status)
-                                    .font(.app(size: 13, weight: .medium))
-                                    .foregroundStyle(housingAvailabilityStatus == status ? .white : .primary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        housingAvailabilityStatus == status ? Color.appAccent : Color(.systemGray6),
-                                        in: Capsule()
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        Spacer()
-                    }
-                    
-                    if housingAvailabilityStatus == "Currently living here" {
-                        HStack {
-                            Text("Leaving on")
-                                .font(.app(size: 14, weight: .medium))
-                                .foregroundStyle(.secondary)
-                            
-                            Spacer()
-                            
-                            DatePicker("", selection: $housingAvailability, in: Date()..., displayedComponents: .date)
-                                .labelsHidden()
-                                .tint(Color.appAccent)
-                        }
-                    } else {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.green)
-                            Text("Available now")
-                                .font(.app(size: 14, weight: .medium))
-                                .foregroundStyle(.green)
-                            Spacer()
-                        }
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
-                )
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Description")
-                    .font(.app(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                ZStack(alignment: .topLeading) {
-                    TextEditor(text: $housingDescription)
-                        .frame(minHeight: 100)
-                        .padding(8)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
-                        )
-                    if housingDescription.isEmpty {
-                        Text("Describe the place, what's included, and what makes it special.")
-                            .font(.app(size: 13, weight: .medium))
-                            .foregroundStyle(.secondary.opacity(0.8))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 16)
-                    }
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Photos")
-                    .font(.app(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                
-                PhotosPicker(
-                    selection: $selectedPhotoItems,
-                    maxSelectionCount: 10,
-                    matching: .images,
-                    photoLibrary: .shared()
-                ) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "photo.on.rectangle.angled")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.appAccent)
-                        Text(selectedImages.isEmpty ? "Select photos" : "\(selectedImages.count) photo\(selectedImages.count > 1 ? "s" : "") selected")
-                            .font(.app(size: 15, weight: .medium))
-                            .foregroundStyle(selectedImages.isEmpty ? .secondary : .primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .onChange(of: selectedPhotoItems) { _, newItems in
-                    Task {
-                        selectedImages.removeAll()
-                        for item in newItems {
-                            if let data = try? await item.loadTransferable(type: Data.self),
-                               let image = UIImage(data: data) {
-                                selectedImages.append(image)
-                            }
-                        }
-                    }
-                }
-                
-                if !selectedImages.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(Array(selectedImages.enumerated()), id: \.offset) { index, image in
-                                ZStack(alignment: .topTrailing) {
-                                    Image(uiImage: image)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 80, height: 80)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                    
-                                    Button(action: {
-                                        selectedImages.remove(at: index)
-                                        if index < selectedPhotoItems.count {
-                                            selectedPhotoItems.remove(at: index)
-                                        }
-                                    }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.system(size: 18))
-                                            .foregroundStyle(.white, Color.black.opacity(0.6))
-                                    }
-                                    .offset(x: 6, y: -6)
-                                }
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Badges")
-                    .font(.app(size: 14, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                badgeGrid(options: housingBadgeOptions, selection: $housingBadgesSelected)
-                formTextField("Custom badges (comma separated)", text: $housingBadgesCustom)
+            switch currentStep {
+            case 0:
+                housingBasicsFields
+            case 1:
+                housingDetailsFields
+            default:
+                housingExtrasFields
             }
         }
     }
 
     private var roommatesForm: some View {
         VStack(alignment: .leading, spacing: 12) {
-            formTextField("Name", text: $roommateName)
-            HStack(spacing: 12) {
-                formTextField("Age", text: $roommateAge, keyboard: .numberPad)
-                formTextField("Budget", text: $roommateBudget, keyboard: .numberPad)
+            switch currentStep {
+            case 0:
+                roommateBasicsFields
+            default:
+                roommateExtrasFields
             }
-            formTextField("Location", text: $roommateLocation)
-            formTextField("Move-in date", text: $roommateMoveIn)
-            formTextField("Tags (comma separated)", text: $roommateTags)
+        }
+    }
+
+    @ViewBuilder
+    private var housingBasicsFields: some View {
+        formTextField("Title", text: $housingTitle)
+
+        HStack(spacing: 8) {
+            TextField("Price", text: $housingPrice)
+                .keyboardType(.numberPad)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+                )
+                .frame(maxWidth: .infinity)
+
+            Text("per")
+                .font(.app(size: 14, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            periodPicker
+        }
+
+        formPicker("Type", selection: $housingType, options: ["Apartment", "House", "Student residence", "Room"])
+
+        formTextField("Address", text: $housingAddress)
+    }
+
+    @ViewBuilder
+    private var housingDetailsFields: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Rating")
+                .font(.app(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                ForEach(1...5, id: \.self) { star in
+                    Button(action: {
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                            housingRating = star
+                        }
+                    }) {
+                        Image(systemName: star <= housingRating ? "star.fill" : "star")
+                            .font(.system(size: 28, weight: .regular))
+                            .foregroundStyle(star <= housingRating ? .yellow : Color(.systemGray4))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer()
+
+                if housingRating > 0 {
+                    Text(ratingLabel(for: housingRating))
+                        .font(.app(size: 14, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+            )
+        }
+
+        formTextField("Contact (email, phone, or other)", text: $housingContact)
+
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Next availability")
+                .font(.app(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    ForEach(["Currently living here", "Already left"], id: \.self) { status in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                housingAvailabilityStatus = status
+                            }
+                        }) {
+                            Text(status)
+                                .font(.app(size: 13, weight: .medium))
+                                .foregroundStyle(housingAvailabilityStatus == status ? .white : .primary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(
+                                    housingAvailabilityStatus == status ? Color.appAccent : Color(.systemGray6),
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Spacer()
+                }
+
+                if housingAvailabilityStatus == "Currently living here" {
+                    HStack {
+                        Text("Leaving on")
+                            .font(.app(size: 14, weight: .medium))
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        DatePicker("", selection: $housingAvailability, in: Date()..., displayedComponents: .date)
+                            .labelsHidden()
+                            .tint(Color.appAccent)
+                    }
+                } else {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.green)
+                        Text("Available now")
+                            .font(.app(size: 14, weight: .medium))
+                            .foregroundStyle(.green)
+                        Spacer()
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var housingExtrasFields: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Description")
+                .font(.app(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $housingDescription)
+                    .frame(minHeight: 100)
+                    .padding(8)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+                    )
+                if housingDescription.isEmpty {
+                    Text("Describe the place, what's included, and what makes it special.")
+                        .font(.app(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary.opacity(0.8))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
+                }
+            }
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Photos")
+                .font(.app(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            PhotosPicker(
+                selection: $selectedPhotoItems,
+                maxSelectionCount: 10,
+                matching: .images,
+                photoLibrary: .shared()
+            ) {
+                HStack(spacing: 10) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.appAccent)
+                    Text(selectedImages.isEmpty ? "Select photos" : "\(selectedImages.count) photo\(selectedImages.count > 1 ? "s" : "") selected")
+                        .font(.app(size: 15, weight: .medium))
+                        .foregroundStyle(selectedImages.isEmpty ? .secondary : .primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .onChange(of: selectedPhotoItems) { _, newItems in
+                Task {
+                    selectedImages.removeAll()
+                    for item in newItems {
+                        if let data = try? await item.loadTransferable(type: Data.self),
+                           let image = UIImage(data: data) {
+                            selectedImages.append(image)
+                        }
+                    }
+                }
+            }
+
+            if !selectedImages.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(Array(selectedImages.enumerated()), id: \.offset) { index, image in
+                            ZStack(alignment: .topTrailing) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 80, height: 80)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                                Button(action: {
+                                    selectedImages.remove(at: index)
+                                    if index < selectedPhotoItems.count {
+                                        selectedPhotoItems.remove(at: index)
+                                    }
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(.white, Color.black.opacity(0.6))
+                                }
+                                .offset(x: 6, y: -6)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Badges")
+                .font(.app(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
+            badgeGrid(options: housingBadgeOptions, selection: $housingBadgesSelected)
+            formTextField("Custom badges (comma separated)", text: $housingBadgesCustom)
+        }
+    }
+
+    @ViewBuilder
+    private var roommateBasicsFields: some View {
+        formTextField("Name", text: $roommateName)
+        HStack(spacing: 12) {
+            formTextField("Age", text: $roommateAge, keyboard: .numberPad)
+            formTextField("Budget", text: $roommateBudget, keyboard: .numberPad)
+        }
+        formTextField("Location", text: $roommateLocation)
+    }
+
+    @ViewBuilder
+    private var roommateExtrasFields: some View {
+        formTextField("Move-in date", text: $roommateMoveIn)
+        formTextField("Tags (comma separated)", text: $roommateTags)
+    }
+
+    private var totalSteps: Int {
+        selectedTab == .spots ? 3 : 2
+    }
+
+    private var stepTitles: [String] {
+        selectedTab == .spots
+            ? ["Basics", "Details", "Media & badges"]
+            : ["Basics", "Move-in & tags"]
+    }
+
+    private var stepSubtitles: [String] {
+        selectedTab == .spots
+            ? [
+                "Title, price, type, and address.",
+                "Rating, contact, and availability.",
+                "Description, photos, and badges."
+            ]
+            : [
+                "Name, age, budget, and location.",
+                "Move-in date and tags."
+            ]
+    }
+
+    private var stepTitle: String {
+        stepTitles[min(currentStep, stepTitles.count - 1)]
+    }
+
+    private var stepSubtitle: String {
+        stepSubtitles[min(currentStep, stepSubtitles.count - 1)]
+    }
+
+    private var stepIndicator: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<totalSteps, id: \.self) { index in
+                Capsule()
+                    .fill(index <= currentStep ? Color.appAccent : Color.black.opacity(0.1))
+                    .frame(width: index == currentStep ? 28 : 12, height: 6)
+            }
+            Spacer()
+            Text("Step \(min(currentStep + 1, totalSteps)) of \(totalSteps)")
+                .font(.app(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var isLastStep: Bool {
+        currentStep >= totalSteps - 1
+    }
+
+    private var canProceedCurrentStep: Bool {
+        if isLastStep {
+            return canPublish
+        }
+        return canAdvance
+    }
+
+    private var canAdvance: Bool {
+        switch selectedTab {
+        case .spots:
+            if currentStep == 0 {
+                return !housingTitle.isEmpty && Int(housingPrice) != nil
+            }
+            return true
+        case .roommates:
+            if currentStep == 0 {
+                return !roommateName.isEmpty && Int(roommateAge) != nil && Int(roommateBudget) != nil && !roommateLocation.isEmpty
+            }
+            return true
+        }
+    }
+
+    private func nextStep() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            currentStep = min(currentStep + 1, totalSteps - 1)
+        }
+    }
+
+    private func previousStep() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            currentStep = max(currentStep - 1, 0)
         }
     }
 
 
     private var actionBar: some View {
-        Button(action: handleCreate) {
-            Text("Publish")
-                .font(.app(size: 16, weight: .semibold))
+        HStack(spacing: 12) {
+            Button(action: previousStep) {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Back")
+                        .font(.app(size: 14, weight: .semibold))
+                }
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.white.opacity(0.7), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(currentStep == 0)
+            .opacity(currentStep == 0 ? 0 : 1)
+
+            Spacer()
+
+            Button(action: {
+                if isLastStep {
+                    handleCreate()
+                } else {
+                    nextStep()
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Text(isLastStep ? "Publish" : "Next")
+                        .font(.app(size: 16, weight: .semibold))
+                    Image(systemName: isLastStep ? "checkmark" : "arrow.right")
+                        .font(.system(size: 14, weight: .semibold))
+                }
                 .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(canPublish ? Color.appAccent : Color(.systemGray5), in: Capsule())
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(
+                    canProceedCurrentStep ? Color.appAccent : Color(.systemGray5),
+                    in: Capsule()
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!canProceedCurrentStep)
         }
-        .buttonStyle(.plain)
-        .disabled(!canPublish)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(Color.white)
+        .overlay(
+            Rectangle()
+                .frame(height: 1)
+                .foregroundStyle(Color.black.opacity(0.06)),
+            alignment: .top
+        )
     }
 
     private var canPublish: Bool {

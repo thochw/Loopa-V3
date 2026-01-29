@@ -220,7 +220,7 @@ struct MainTabView: View {
         switch tab {
         case .explore: return "globe.americas"
         case .map: return "person.2"
-        case .housing: return "airplane"
+        case .housing: return "suitcase"
         case .chats: return "bubble.left.and.bubble.right"
         }
     }
@@ -237,22 +237,11 @@ struct MainTabView: View {
     @ViewBuilder
     private func tabIcon(for tab: AppTab) -> some View {
         let isSelected = selectedTab == tab
-
-        if tab == .chats, UIImage(named: "DMsIcon") != nil {
-            Image("DMsIcon")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 22, height: 22)
-                .foregroundStyle(isSelected ? Color.appAccent : Color.black)
-                .scaleEffect(isSelected ? 1.1 : 1.0)
-        } else {
-            Image(systemName: iconName(for: tab))
-                .font(.system(size: 22, weight: .bold))
-                .symbolVariant(isSelected ? .fill : .none)
-                .foregroundStyle(isSelected ? Color.appAccent : Color.black)
-                .scaleEffect(isSelected ? 1.1 : 1.0)
-        }
+        Image(systemName: iconName(for: tab))
+            .font(.system(size: 22, weight: .bold))
+            .symbolVariant(isSelected ? .fill : .none)
+            .foregroundStyle(isSelected ? Color.appAccent : Color.black)
+            .scaleEffect(isSelected ? 1.1 : 1.0)
     }
 
     private func chatForUser(_ user: User) -> Chat {
