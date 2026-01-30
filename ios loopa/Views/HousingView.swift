@@ -2212,7 +2212,7 @@ private struct CreateHousingListingView: View {
     @State private var housingAddress = ""
     @State private var housingAvailability: Date = Date()
     @State private var housingAvailabilityStatus: String? = nil
-    @State private var contactMethod: ContactMethod? = nil
+    @State private var selectedContactMethod: ContactMethod? = nil
     @State private var contactPhone = ""
     @State private var contactEmail = ""
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
@@ -2363,30 +2363,103 @@ private struct CreateHousingListingView: View {
 
     @ViewBuilder
     private var housingBasicsFields: some View {
-        formTextField("Title", text: $housingTitle)
-
-        HStack(spacing: 8) {
-            TextField("Price", text: $housingPrice)
-                .keyboardType(.numberPad)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
-                )
-                .frame(maxWidth: .infinity)
-
-            Text("per")
-                .font(.app(size: 14, weight: .medium))
-                .foregroundStyle(.secondary)
-
-            periodPicker
+        formFieldSection(icon: "pencil.line", title: "Title") {
+            styledTextField("Give your place a name", text: $housingTitle)
         }
 
-        formPicker("Type", selection: $housingType, options: housingTypeOptions)
+        formFieldSection(icon: "dollarsign.circle.fill", title: "Price") {
+            HStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    Text("$")
+                        .font(.app(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    TextField("0", text: $housingPrice)
+                        .keyboardType(.numberPad)
+                        .font(.app(size: 16, weight: .medium))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(Color(.systemGray6).opacity(0.8), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .frame(maxWidth: .infinity)
 
-        addressAutocompleteField
+                Text("/")
+                    .font(.app(size: 16, weight: .medium))
+                    .foregroundStyle(.secondary)
+
+                periodPicker
+            }
+        }
+
+        formFieldSection(icon: "building.2.fill", title: "Type of place") {
+            styledPicker(selection: $housingType, options: housingTypeOptions)
+        }
+
+        formFieldSection(icon: "mappin.and.ellipse", title: "Location") {
+            addressAutocompleteField
+        }
+    }
+
+    private func formFieldSection<Content: View>(
+        icon: String,
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(title)
+                    .font(.app(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+            }
+            content()
+        }
+    }
+
+    private func styledTextField(
+        _ placeholder: String,
+        text: Binding<String>,
+        keyboard: UIKeyboardType = .default
+    ) -> some View {
+        TextField(placeholder, text: text)
+            .keyboardType(keyboard)
+            .font(.app(size: 16, weight: .medium))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color(.systemGray6).opacity(0.8), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func styledPicker(
+        selection: Binding<String>,
+        options: [(value: String, label: String)]
+    ) -> some View {
+        Menu {
+            ForEach(options, id: \.value) { option in
+                Button(action: { selection.wrappedValue = option.value }) {
+                    HStack {
+                        Text(option.label)
+                        if selection.wrappedValue == option.value {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            let selectedLabel = options.first(where: { $0.value == selection.wrappedValue })?.label ?? selection.wrappedValue
+            HStack {
+                Text(selectedLabel.isEmpty ? "Select type" : selectedLabel)
+                    .font(.app(size: 16, weight: .medium))
+                    .foregroundStyle(selectedLabel.isEmpty ? .secondary : .primary)
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color(.systemGray6).opacity(0.8), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
     }
 
     @ViewBuilder
@@ -2697,12 +2770,12 @@ private struct CreateHousingListingView: View {
         method: ContactMethod,
         text: Binding<String>
     ) -> some View {
-        let isSelected = contactMethod == method
+        let isSelected = selectedContactMethod == method
 
         return HStack(spacing: 10) {
             Button(action: {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    contactMethod = isSelected ? nil : method
+                    selectedContactMethod = isSelected ? nil : method
                 }
             }) {
                 Text(emoji)
@@ -3135,19 +3208,16 @@ private struct CreateHousingListingView: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text(housingPeriod.isEmpty ? "Period" : housingPeriod)
-                    .foregroundStyle(.black)
+                Text(housingPeriod.isEmpty ? "mo" : housingPeriod)
+                    .font(.app(size: 16, weight: .medium))
+                    .foregroundStyle(.primary)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.black.opacity(0.7))
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
-            )
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color(.systemGray6).opacity(0.8), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 
