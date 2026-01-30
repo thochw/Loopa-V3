@@ -3465,32 +3465,44 @@ private struct HousingDetailSheet: View {
     let spot: HousingSpot
     let onClose: () -> Void
     
+    @State private var showPhotoGallery = false
+    @State private var selectedPhotoIndex = 0
+    
     var body: some View {
-        NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    housingHero
-                    housingHeader
-                    housingInfoCards
-                    housingDescription
-                    housingBadges
-                    housingRecommender
-                    housingPhotos
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 40)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: onClose) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.secondary)
+        GeometryReader { geometry in
+            ZStack(alignment: .bottom) {
+                Color.white.ignoresSafeArea()
+                
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        heroImageSection(width: geometry.size.width)
+                            .onTapGesture {
+                                selectedPhotoIndex = 0
+                                showPhotoGallery = true
+                            }
+                        
+                        contentCard
+                            .offset(y: -28)
                     }
                 }
+                .ignoresSafeArea(edges: .top)
+                
+                bottomBar
+            }
+            .overlay(alignment: .topTrailing) {
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 34, height: 34)
+                        .background(Color.white, in: Circle())
+                        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                }
+                .padding(.trailing, 20)
+                .padding(.top, 16)
+            }
+            .sheet(isPresented: $showPhotoGallery) {
+                PhotoGalleryView(photos: spot.photos.isEmpty ? [spot.image] : spot.photos, selectedIndex: $selectedPhotoIndex)
             }
         }
         .environment(\.colorScheme, .light)
@@ -3498,9 +3510,9 @@ private struct HousingDetailSheet: View {
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
     }
-
-    private var housingHero: some View {
-        ZStack(alignment: .topTrailing) {
+    
+    private func heroImageSection(width: CGFloat) -> some View {
+        ZStack(alignment: .bottomTrailing) {
             let heroImage = spot.photos.first ?? spot.image
             AsyncImage(url: URL(string: heroImage)) { phase in
                 if let image = phase.image {
@@ -3514,114 +3526,116 @@ private struct HousingDetailSheet: View {
                         .tint(.secondary)
                 }
             }
-            .frame(height: 260)
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.08), radius: 10, y: 6)
-
-            HStack(spacing: 4) {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.yellow)
-                Text(String(format: "%.1f", spot.rating))
-                    .font(.app(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
+            .frame(width: width, height: 320)
+            .clipped()
+            
+            Text("\(max(1, spot.photos.count))/\(max(1, spot.photos.count))")
+                .font(.app(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.black.opacity(0.6), in: Capsule())
+                .padding(16)
+        }
+    }
+    
+    private var contentCard: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                titleSection
+                divider
+                statsRow
+                divider
+                recommenderSection
+                divider
+                featuredBadgeSection
+                descriptionSection
+                featuresSection
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .padding(16)
+            .padding(.top, 24)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 120)
         }
+        .frame(maxWidth: .infinity)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .shadow(color: .black.opacity(0.1), radius: 18, y: -6)
     }
-
-    private var housingHeader: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(spot.title)
-                .font(.app(size: 24, weight: .bold))
-                .foregroundStyle(.black)
-
-            HStack(spacing: 6) {
-                Image(systemName: "house.fill")
-                Text(spot.type)
+    
+    private var titleSection: some View {
+        VStack(alignment: .center, spacing: 6) {
+            HStack(alignment: .center, spacing: 6) {
+                Text("🏠")
+                    .font(.system(size: 18))
+                Text(spot.title)
+                    .font(.app(size: 22, weight: .bold))
+                    .foregroundStyle(.black)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .font(.app(size: 13, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color(.systemGray6), in: Capsule())
-        }
-    }
-
-    private var housingInfoCards: some View {
-        HStack(spacing: 12) {
-            infoCard(
-                title: "Price",
-                subtitle: "Per \(spot.period)",
-                systemImage: "banknote.fill",
-                value: "\(spot.currency)\(spot.price)"
-            )
-            infoCard(
-                title: "Rating",
-                subtitle: "User review",
-                systemImage: "star.fill",
-                value: String(format: "%.1f", spot.rating)
-            )
-        }
-    }
-
-    private var housingDescription: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Description")
-            Text(spot.description)
-                .font(.app(size: 15, weight: .regular))
+            
+            Text("\(spot.type) · \(spot.address ?? "Location")")
+                .font(.app(size: 14, weight: .regular))
                 .foregroundStyle(.secondary)
-                .lineSpacing(5)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
-                )
-        }
-    }
-
-    private var housingBadges: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Features")
-
-            if spot.badges.isEmpty {
-                Text("✨ Cozy, well-located, and fully equipped.")
-                    .font(.app(size: 14, weight: .semibold))
+                .multilineTextAlignment(.center)
+            
+            if !spot.badges.isEmpty {
+                Text(spot.badges.prefix(3).joined(separator: " · "))
+                    .font(.app(size: 14, weight: .regular))
                     .foregroundStyle(.secondary)
-            } else {
-                FlowLayout(spacing: 8) {
-                    ForEach(spot.badges, id: \.self) { badge in
-                        Text(badgeDisplayText(badge))
-                            .font(.app(size: 13, weight: .semibold))
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
+    }
+    
+    private var statsRow: some View {
+        HStack(spacing: 24) {
+            VStack(spacing: 4) {
+                Text(String(format: "%.1f", spot.rating))
+                    .font(.app(size: 20, weight: .bold))
+                    .foregroundStyle(.black)
+                HStack(spacing: 2) {
+                    ForEach(0..<5, id: \.self) { index in
+                        Image(systemName: index < Int(spot.rating) ? "star.fill" : "star")
+                            .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(.black)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(Color.white, in: Capsule())
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(Color.black.opacity(0.08), lineWidth: 1)
-                            )
                     }
                 }
             }
+            
+            Rectangle()
+                .fill(Color(.systemGray4))
+                .frame(width: 1, height: 44)
+            
+            VStack(spacing: 2) {
+                HStack(spacing: 4) {
+                    Text("🏆")
+                        .font(.system(size: 14))
+                    Text("Traveler")
+                        .font(.app(size: 11, weight: .semibold))
+                        .foregroundStyle(.black)
+                    Text("🏆")
+                        .font(.system(size: 14))
+                }
+                Text("favorite")
+                    .font(.app(size: 11, weight: .semibold))
+                    .foregroundStyle(.black)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 20)
     }
-
-    private var housingRecommender: some View {
+    
+    private var recommenderSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Recommended by")
-
+            Text("Recommended by")
+                .font(.app(size: 18, weight: .bold))
+                .foregroundStyle(.black)
+            
             HStack(spacing: 12) {
                 AsyncImage(url: URL(string: spot.recommenderImg)) { phase in
                     if let image = phase.image {
@@ -3633,93 +3647,184 @@ private struct HousingDetailSheet: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .frame(width: 44, height: 44)
+                .frame(width: 46, height: 46)
                 .clipShape(Circle())
-                .overlay(Circle().strokeBorder(.quaternary, lineWidth: 1))
-
-                Text(spot.recommender)
-                    .font(.app(size: 16, weight: .semibold))
-                    .foregroundStyle(.black)
-
+                .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Recommended by: \(spot.recommender)")
+                        .font(.app(size: 15, weight: .semibold))
+                        .foregroundStyle(.black)
+                    HStack(spacing: 6) {
+                        Text("✓")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.green)
+                            .padding(4)
+                            .background(Color.green.opacity(0.15), in: Circle())
+                        Text("Verified member")
+                            .font(.app(size: 13, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
                 Spacer()
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
-            )
         }
+        .padding(.vertical, 16)
     }
-
-    private var housingPhotos: some View {
-        Group {
-            if spot.photos.count > 1 {
-                VStack(alignment: .leading, spacing: 12) {
-                    sectionTitle("Photos")
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(Array(spot.photos.enumerated()), id: \.offset) { _, photo in
-                                AsyncImage(url: URL(string: photo)) { phase in
-                                    if let image = phase.image {
-                                        image
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                    } else {
-                                        Color(.systemGray5)
-                                    }
-                                }
-                                .frame(width: 140, height: 110)
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
-                                )
-                            }
-                        }
-                    }
+    
+    private var featuredBadgeSection: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text("🏆")
+                .font(.system(size: 22))
+            VStack(alignment: .leading, spacing: 6) {
+                Text("This home is a traveler favorite")
+                    .font(.app(size: 15, weight: .semibold))
+                    .foregroundStyle(.black)
+                Text("Highly rated for comfort, cleanliness, and location.")
+                    .font(.app(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 12)
+    }
+    
+    private var descriptionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("About this place")
+                .font(.app(size: 18, weight: .bold))
+                .foregroundStyle(.black)
+            Text(spot.description)
+                .font(.app(size: 14, weight: .regular))
+                .foregroundStyle(.secondary)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 16)
+    }
+    
+    private var featuresSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("What this place offers")
+                .font(.app(size: 18, weight: .bold))
+                .foregroundStyle(.black)
+            
+            let columns = [GridItem(.flexible()), GridItem(.flexible())]
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+                ForEach(spot.badges, id: \.self) { badge in
+                    Text(badgeDisplayText(badge))
+                        .font(.app(size: 13, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 12)
+                        .background(Color(.systemGray6).opacity(0.6), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
             }
         }
+        .padding(.vertical, 16)
     }
-
-    private func infoCard(title: String, subtitle: String, systemImage: String, value: String) -> some View {
-        HStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(Color.appAccent.opacity(0.15))
-                Image(systemName: systemImage)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.appAccent)
-            }
-            .frame(width: 34, height: 34)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(value)
-                    .font(.app(size: 18, weight: .bold))
-                    .foregroundStyle(.black)
-                Text("\(title) • \(subtitle)")
-                    .font(.app(size: 12, weight: .medium))
+    
+    private var bottomBar: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Availability")
+                    .font(.app(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(spot.isAvailableNow ? Color.green : Color.orange)
+                        .frame(width: 8, height: 8)
+                    Text(spot.isAvailableNow ? "Available now" : "Available \(formatAvailabilityDate(spot.availableDate))")
+                        .font(.app(size: 14, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
             }
-
-            Spacer(minLength: 0)
+            
+            Spacer()
+            
+            Button(action: {}) {
+                HStack(spacing: 8) {
+                    Image(systemName: "envelope.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Contact")
+                        .font(.app(size: 16, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(Color.appAccent, in: Capsule())
+            }
+            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(Color.white)
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+            Rectangle()
+                .fill(Color(.systemGray4).opacity(0.5))
+                .frame(height: 1),
+            alignment: .top
         )
     }
+    
+    private var divider: some View {
+        Rectangle()
+            .fill(Color(.systemGray4).opacity(0.5))
+            .frame(maxWidth: .infinity)
+            .frame(height: 1)
+    }
+    
+    private func formatAvailabilityDate(_ date: Date?) -> String {
+        guard let date else { return "soon" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+}
 
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title)
-            .font(.app(size: 19, weight: .bold))
-            .foregroundStyle(.black)
+private struct PhotoGalleryView: View {
+    let photos: [String]
+    @Binding var selectedIndex: Int
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            
+            TabView(selection: $selectedIndex) {
+                ForEach(Array(photos.enumerated()), id: \.offset) { index, url in
+                    AsyncImage(url: URL(string: url)) { phase in
+                        if let image = phase.image {
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        } else if phase.error != nil {
+                            Color(.systemGray5)
+                        } else {
+                            ProgressView()
+                                .tint(.white)
+                        }
+                    }
+                    .tag(index)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .automatic))
+            
+            Button(action: { dismiss() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Color.black.opacity(0.6), in: Circle())
+            }
+            .padding(.trailing, 20)
+            .padding(.top, 20)
+        }
     }
 }
 
